@@ -1,35 +1,23 @@
-// src/app/api/auth/register/route.ts
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "../../../../lib/prisma";
-import { sendVerificationEmail } from "../../../../lib/email";
+import { prisma } from "@/lib/prisma";
+import { sendVerificationEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
+
+const allowedRoles = ["student", "teacher", "question_setter"] as const;
+type AllowedRole = typeof allowedRoles[number];
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { username, email, password, role, phone, grade, fullName, subject } = body;
 
-    // --- Role Validation Start ---
-    const allowedRoles = ["student", "teacher", "question_setter"] as const;
-    type AllowedRole = typeof allowedRoles[number];
-
     if (!allowedRoles.includes(role as AllowedRole)) {
-      return NextResponse.json(
-        { error: "Invalid role selected" }, 
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid role selected" }, { status: 400 });
     }
-    // --- Role Validation End ---
 
-    // Check if user already exists
     const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { username },
-        ],
-      },
+      where: { OR: [{ email }, { username }] },
     });
 
     if (existingUser) {
@@ -39,69 +27,47 @@ export async function POST(req: Request) {
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with conditional nested details
     const user = await prisma.user.create({
       data: {
-        username,
-        email,
+        username, email,
         password: hashedPassword,
-        role,
-        phone,
+        role, phone,
+        isVerified: true, // set false when SMTP is configured
         grade: role === "student" ? grade : null,
         ...(role === "question_setter" && {
-          questionSetterDetails: {
-            create: {
-              fullName,
-              subject,
-            },
-          },
+          questionSetterDetails: { create: { fullName: fullName || "", subject } },
         }),
         ...(role === "teacher" && {
-          teacherDetails: {
-            create: {
-              fullName,
-              subject,
-            },
-          },
+          teacherDetails: { create: { fullName: fullName || "", subject } },
         }),
         ...(role === "student" && {
-          studentDetails: {
-            create: {
-              grade,
-            },
-          },
+          studentDetails: { create: { grade } },
         }),
       },
     });
 
-    // Create email verification token
     const token = randomBytes(32).toString("hex");
     const expires = new Date();
     expires.setHours(expires.getHours() + 24);
 
     await prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        token,
-        expires,
-      },
+      data: { userId: user.id, token, expires },
     });
 
-    // Send verification email
-    await sendVerificationEmail(email, token);
+    try {
+      await sendVerificationEmail(email, token);
+    } catch (emailError) {
+      console.error("Verification email failed (user still created):", emailError);
+    }
 
     return NextResponse.json(
-      { message: "User created successfully. Please check your email to verify your account." },
+      { message: "Account created successfully. You can now log in." },
       { status: 201 }
     );
   } catch (error) {
     console.error("Registration error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

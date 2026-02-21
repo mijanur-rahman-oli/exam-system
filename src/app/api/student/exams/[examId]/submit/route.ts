@@ -1,4 +1,3 @@
-// src/app/api/student/exams/[examId]/submit/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -10,87 +9,80 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user || session.user.role !== "student") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const examId = parseInt(params.examId);
     const studentId = parseInt(session.user.id);
-    const { attemptId, answers } = await req.json();
+    const examId = parseInt(params.examId);
+    const body = await req.json();
+    const { attemptId, answers } = body as {
+      attemptId: number;
+      answers: { questionId: number; selectedAnswer: string }[];
+    };
 
-    // Get exam attempt
-    const attempt = await prisma.examAttempt.findUnique({
-      where: { id: attemptId },
-      include: {
-        exam: {
-          include: {
-            examQuestions: {
-              include: {
-                question: true,
-              },
-            },
-          },
-        },
-      },
+    if (!attemptId || !Array.isArray(answers)) {
+      return NextResponse.json({ error: "attemptId and answers are required" }, { status: 400 });
+    }
+
+    // Verify this attempt belongs to this student
+    const attempt = await prisma.examAttempt.findFirst({
+      where: { id: attemptId, studentId, examId, isCompleted: false },
     });
 
-    if (!attempt || attempt.studentId !== studentId) {
-      return NextResponse.json({ error: "Invalid attempt" }, { status: 404 });
+    if (!attempt) {
+      return NextResponse.json({ error: "Attempt not found or already submitted" }, { status: 404 });
     }
 
-    if (attempt.isCompleted) {
-      return NextResponse.json({ error: "Exam already submitted" }, { status: 400 });
-    }
+    // Fetch correct answers for all submitted questions
+    const questionIds = answers.map((a) => a.questionId);
+    const questions = await prisma.question.findMany({
+      where: { id: { in: questionIds } },
+      select: { id: true, correctAnswer: true, marks: true },
+    });
 
-    // Calculate results
+    const questionMap = new Map(questions.map((q) => [q.id, q]));
+
+    // Calculate score and build answer records
     let totalScore = 0;
-    const results = [];
+    let totalMarks = 0;
 
-    for (const eq of attempt.exam.examQuestions) {
-      const selectedAnswer = answers[eq.questionId];
-      const isCorrect = selectedAnswer === eq.question.correctAnswer;
-      const marksObtained = isCorrect ? eq.marks : 0;
-      
-      totalScore += marksObtained;
-
-      results.push({
-        examAttemptId: attemptId,
-        questionId: eq.questionId,
-        selectedAnswer,
+    const answerRecords = answers.map((a) => {
+      const q = questionMap.get(a.questionId);
+      const isCorrect = q ? q.correctAnswer === a.selectedAnswer : false;
+      const marksEarned = isCorrect && q ? q.marks : 0;
+      totalScore += marksEarned;
+      if (q) totalMarks += q.marks;
+      return {
+        attemptId,
+        questionId: a.questionId,
+        selectedAnswer: a.selectedAnswer,
         isCorrect,
-        marksObtained,
-      });
-    }
+        marksEarned,
+      };
+    });
 
-    // Save results and update attempt
-    await prisma.$transaction([
-      prisma.examResult.createMany({
-        data: results,
-      }),
+    const percentage = totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0;
+
+    // Save answers and mark attempt complete in a transaction
+    const [, updatedAttempt] = await prisma.$transaction([
+      prisma.examAnswer.createMany({ data: answerRecords }),
       prisma.examAttempt.update({
         where: { id: attemptId },
         data: {
+          isCompleted: true,
           score: totalScore,
           submittedAt: new Date(),
-          isCompleted: true,
         },
       }),
     ]);
 
-    // Get total marks
-    const totalMarks = attempt.exam.examQuestions.reduce(
-      (sum, eq) => sum + eq.marks,
-      0
-    );
-
-    // Updated return statement with safe division and rounding
     return NextResponse.json({
-      resultId: attemptId,
+      resultId: updatedAttempt.id,
       score: totalScore,
       totalMarks,
-      percentage: totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0,
+      percentage,
     });
-    
   } catch (error) {
     console.error("Submit exam error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

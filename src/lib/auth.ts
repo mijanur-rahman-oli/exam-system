@@ -20,9 +20,8 @@ export const authOptions: NextAuthOptions = {
 
         if (!user) return null;
 
-        if (!user.isVerified) {
-          throw new Error("Please verify your email before logging in.");
-        }
+        // Uncomment in production when email verification is configured:
+        // if (!user.isVerified) return null;
 
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) return null;
@@ -32,6 +31,7 @@ export const authOptions: NextAuthOptions = {
           username: user.username,
           email: user.email,
           role: user.role,
+          name: user.username,
         };
       },
     }),
@@ -46,20 +46,23 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.username = token.username as string;
-      }
+      session.user.id = token.id as string;
+      session.user.role = token.role as string;
+      session.user.username = token.username as string;
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // After login always go to /dashboard which then redirects by role
+      if (url === baseUrl || url === `${baseUrl}/`) return `${baseUrl}/dashboard`;
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return `${baseUrl}/dashboard`;
     },
   },
   pages: {
     signIn: "/login",
     error: "/login",
   },
-  session: {
-    strategy: "jwt",
-  },
+  session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
 };

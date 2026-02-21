@@ -1,4 +1,3 @@
-// src/app/api/student/exams/[examId]/start/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -10,53 +9,48 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user || session.user.role !== "student") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const examId = parseInt(params.examId);
     const studentId = parseInt(session.user.id);
+    const examId = parseInt(params.examId);
 
-    // Check if exam exists and is active
     const exam = await prisma.exam.findUnique({
-      where: { id: examId },
-      include: {
-        examQuestions: true,
-      },
+      where: { id: examId, isActive: true },
+      select: { id: true, duration: true, retakeAllowed: true },
     });
 
-    if (!exam || !exam.isActive) {
-      return NextResponse.json({ error: "Exam not found or inactive" }, { status: 404 });
+    if (!exam) {
+      return NextResponse.json({ error: "Exam not found or not active" }, { status: 404 });
     }
 
-    // Check if student has already attempted this exam and retake is not allowed
-    if (!exam.retakeAllowed) {
-      const existingAttempt = await prisma.examAttempt.findFirst({
-        where: {
-          examId,
-          studentId,
-          isCompleted: true,
-        },
-      });
+    // Check for existing completed attempt
+    const existing = await prisma.examAttempt.findFirst({
+      where: { examId, studentId, isCompleted: true },
+    });
 
-      if (existingAttempt) {
-        return NextResponse.json(
-          { error: "You have already attempted this exam" },
-          { status: 400 }
-        );
-      }
+    if (existing && !exam.retakeAllowed) {
+      return NextResponse.json({ error: "You have already completed this exam" }, { status: 400 });
     }
 
-    // Create exam attempt
+    // Check for in-progress attempt
+    const inProgress = await prisma.examAttempt.findFirst({
+      where: { examId, studentId, isCompleted: false },
+    });
+
+    if (inProgress) {
+      const elapsed = Math.floor((Date.now() - new Date(inProgress.startedAt).getTime()) / 1000);
+      const remaining = Math.max(0, exam.duration * 60 - elapsed);
+      return NextResponse.json({ attemptId: inProgress.id, duration: exam.duration, remaining });
+    }
+
+    // Create new attempt
     const attempt = await prisma.examAttempt.create({
-      data: {
-        examId,
-        studentId,
-        startedAt: new Date(),
-      },
+      data: { examId, studentId, startedAt: new Date() },
     });
 
-    return NextResponse.json({ attemptId: attempt.id });
+    return NextResponse.json({ attemptId: attempt.id, duration: exam.duration });
   } catch (error) {
     console.error("Start exam error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

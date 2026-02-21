@@ -1,11 +1,10 @@
-// src/components/dashboard/StudentDashboard.tsx
 "use client";
 
 import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { BookOpen, Clock, Award, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
@@ -41,8 +40,13 @@ export function StudentDashboard() {
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Student Dashboard</h1>
-      
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Student Dashboard</h1>
+        <p className="text-muted-foreground">
+          Welcome back, {session?.user?.username}
+        </p>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -50,7 +54,7 @@ export function StudentDashboard() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalExams || 0}</div>
+            <div className="text-2xl font-bold">{stats?.totalExams ?? 0}</div>
           </CardContent>
         </Card>
 
@@ -60,27 +64,27 @@ export function StudentDashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.averageScore || 0}%</div>
+            <div className="text-2xl font-bold">{stats?.averageScore ?? 0}%</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed Exams</CardTitle>
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.completedExams || 0}</div>
+            <div className="text-2xl font-bold">{stats?.completedExams ?? 0}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Exams</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.pendingExams || 0}</div>
+            <div className="text-2xl font-bold">{stats?.pendingExams ?? 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -92,8 +96,14 @@ export function StudentDashboard() {
         </TabsList>
 
         <TabsContent value="upcoming" className="space-y-4">
-          <div className="grid gap-4">
-            {upcomingExams?.map((exam: any) => (
+          {!upcomingExams || upcomingExams.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">No upcoming exams available.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            upcomingExams.map((exam: any) => (
               <Card key={exam.id}>
                 <CardHeader>
                   <CardTitle>{exam.examName}</CardTitle>
@@ -111,13 +121,19 @@ export function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            ))
+          )}
         </TabsContent>
 
         <TabsContent value="results" className="space-y-4">
-          <div className="grid gap-4">
-            {recentResults?.map((result: any) => (
+          {!recentResults || recentResults.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">No results yet. Take an exam to see your results here.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            recentResults.map((result: any) => (
               <Card key={result.id}>
                 <CardHeader>
                   <CardTitle>{result.examName}</CardTitle>
@@ -126,7 +142,9 @@ export function StudentDashboard() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <p className="text-sm">Score: {result.score}%</p>
-                      <p className="text-sm">Date: {new Date(result.submittedAt).toLocaleDateString()}</p>
+                      <p className="text-sm">
+                        Date: {new Date(result.submittedAt).toLocaleDateString()}
+                      </p>
                     </div>
                     <Link href={`/student/results/${result.id}`}>
                       <Button variant="outline">View Details</Button>
@@ -134,8 +152,8 @@ export function StudentDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            ))
+          )}
         </TabsContent>
       </Tabs>
     </div>
