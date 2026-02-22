@@ -12,7 +12,7 @@ async function main() {
     update: {},
     create: {
       username: 'admin',
-      email: 'admin@example.com',
+      email: 'sheikhmijanurrahmanoli@gmail.com',
       password: adminPassword,
       role: 'admin',
       isVerified: true,

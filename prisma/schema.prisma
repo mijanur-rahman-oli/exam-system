@@ -3,201 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"         
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                      Int       @id @default(autoincrement())
-  username                String    @unique
-  email                   String    @unique
-  password                String
-  role                    Role      @default(student)
-  phone                   String?
-  grade                   String?
-  isVerified              Boolean   @default(false)
-  createdAt               DateTime  @default(now()) @map("created_at")
-  updatedAt               DateTime  @updatedAt @map("updated_at")
-  
-  questionSetterDetails   QuestionSetterDetails?
-  studentDetails          StudentDetails?
-  teacherDetails          TeacherDetails?
-  emailVerificationTokens EmailVerificationToken[]
-  passwordResetTokens     PasswordResetToken[]
-  examAttempts            ExamAttempt[]
-  createdExams            Exam[]    @relation("TeacherExams")
-  createdQuestions        Question[] @relation("QuestionCreator")
-
-  @@map("users")
-}
-
-model QuestionSetterDetails {
-  id          Int     @id @default(autoincrement())
-  userId      Int     @unique @map("user_id")
-  fullName    String  @map("full_name")
-  subject     String?
-  experience  Int?
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@map("question_setter_details")
-}
-
-model StudentDetails {
-  id          Int     @id @default(autoincrement())
-  userId      Int     @unique @map("user_id")
-  grade       String?
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@map("student_details")
-}
-
-model TeacherDetails {
-  id          Int     @id @default(autoincrement())
-  userId      Int     @unique @map("user_id")
-  fullName    String  @map("full_name")
-  subject     String?
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@map("teacher_details")
-}
-
-model EmailVerificationToken {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  token       String   @unique
-  expires     DateTime @map("token_expires")
-  createdAt   DateTime @default(now()) @map("created_at")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@map("email_verification_tokens")
-}
-
-model PasswordResetToken {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  token       String   @unique
-  expires     DateTime @map("token_expires")
-  createdAt   DateTime @default(now()) @map("created_at")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@map("password_reset_tokens")
-}
-
-model Subject {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  chapters    Chapter[]
-  questions   Question[]
-  exams       Exam[]
-  @@map("subjects")
-}
-
-model Chapter {
-  id          Int     @id @default(autoincrement())
-  subjectId   Int     @map("subject_id")
-  name        String  @map("chapter_name")
-  description String?
-  subject     Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  subconcepts Subconcept[]
-  questions   Question[]   // ✅ FIX 3: was missing
-  @@map("chapters")
-}
-
-model Subconcept {
-  id          Int     @id @default(autoincrement())
-  chapterId   Int     @map("chapter_id")
-  name        String  @map("subconcept_name")
-  description String?
-  chapter     Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  questions   Question[]
-  @@map("subconcepts")
-}
-
-model Question {
-  id              Int        @id @default(autoincrement())
-  subjectId       Int        @map("subject_id")
-  chapterId       Int?       @map("chapter_id")
-  subconceptId    Int?       @map("subconcept_id")
-  question        String     @db.Text
-  optionA         String     @map("option_a")
-  optionB         String     @map("option_b")
-  optionC         String?    @map("option_c")
-  optionD         String?    @map("option_d")
-  correctAnswer   String     @map("correct_answer")
-  explanation     String?    @db.Text
-  marks           Int        @default(1)
-  difficulty      Difficulty @default(medium)
-  createdBy       Int        @map("created_by")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
-
-  subject         Subject      @relation(fields: [subjectId], references: [id])
-  chapter         Chapter?     @relation(fields: [chapterId], references: [id])
-  subconcept      Subconcept?  @relation(fields: [subconceptId], references: [id])
-  creator         User         @relation("QuestionCreator", fields: [createdBy], references: [id])
-  examQuestions   ExamQuestion[]
-  examResults     ExamResult[]   // ✅ FIX 2: was missing
-
-  @@map("questions")
-}
-
-model Exam {
-  id              Int       @id @default(autoincrement())
-  examName        String    @map("exam_name")
-  description     String?   @db.Text
-  subjectId       Int       @map("subject_id")
-  gradeLevel      String?   @map("grade_level")
-  duration        Int
-  totalMarks      Int?      @map("total_marks")
-  passingMarks    Int?      @map("passing_marks")
-  scheduleTime    DateTime? @map("schedule_time")
-  isActive        Boolean   @default(false) @map("is_active")
-  retakeAllowed   Boolean   @default(false) @map("retake_allowed")
-  createdBy       Int       @map("created_by")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  subject         Subject      @relation(fields: [subjectId], references: [id])
-  creator         User         @relation("TeacherExams", fields: [createdBy], references: [id])
-  examQuestions   ExamQuestion[]
-  examAttempts    ExamAttempt[]
-
-  @@map("exams")
-}
-
-model ExamQuestion {
-  id          Int  @id @default(autoincrement())
-  examId      Int  @map("exam_id")
-  questionId  Int  @map("question_id")
-  marks       Int  @default(1)
-  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
-  question    Question @relation(fields: [questionId], references: [id])
-  @@unique([examId, questionId])
-  @@map("exam_questions")
-}
-
-model ExamAttempt {
-  id          Int       @id @default(autoincrement())
-  examId      Int       @map("exam_id")
-  studentId   Int       @map("student_id")
-  score       Float?    @default(0)
-  startedAt   DateTime  @default(now()) @map("started_at")
-  submittedAt DateTime? @map("submitted_at")
-  isCompleted Boolean   @default(false) @map("is_completed")
-  exam        Exam        @relation(fields: [examId], references: [id])
-  student     User        @relation(fields: [studentId], references: [id])
-  results     ExamResult[]
-  @@map("exam_attempts")
-}
-
-model ExamResult {
-  id              Int     @id @default(autoincrement())
-  examAttemptId   Int     @map("exam_attempt_id")
-  questionId      Int     @map("question_id")
-  selectedAnswer  String? @map("selected_answer")
-  isCorrect       Boolean @default(false) @map("is_correct")
-  marksObtained   Float?  @default(0) @map("marks_obtained")
-  examAttempt     ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
-  question        Question    @relation(fields: [questionId], references: [id])
-  @@map("exam_results")
-}
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
   admin
@@ -210,4 +20,248 @@ enum Difficulty {
   easy
   medium
   hard
+}
+
+// ─── Users & Auth ─────────────────────────────────────────────────────────────
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      Role     @default(student)
+  phone     String?
+  grade     String?
+  isVerified Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  questionSetterDetails   QuestionSetterDetails?
+  studentDetails          StudentDetails?
+  teacherDetails          TeacherDetails?
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  examAttempts            ExamAttempt[]
+  createdExams            Exam[]     @relation("TeacherExams")
+  createdQuestions        Question[] @relation("QuestionCreator")
+  createdChapters         Chapter[]  @relation("ChapterCreator")
+
+  @@map("users")
+}
+
+model QuestionSetterDetails {
+  id         Int     @id @default(autoincrement())
+  userId     Int     @unique @map("user_id")
+  fullName   String  @map("full_name")
+  subject    String?
+  experience Int?
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("question_setter_details")
+}
+
+model StudentDetails {
+  id     Int     @id @default(autoincrement())
+  userId Int     @unique @map("user_id")
+  grade  String?
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("student_details")
+}
+
+model TeacherDetails {
+  id       Int     @id @default(autoincrement())
+  userId   Int     @unique @map("user_id")
+  fullName String  @map("full_name")
+  subject  String?
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("teacher_details")
+}
+
+model EmailVerificationToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  token     String   @unique
+  expires   DateTime @map("token_expires")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  token     String   @unique
+  expires   DateTime @map("token_expires")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+// ─── Content Hierarchy ────────────────────────────────────────────────────────
+
+model Subject {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  chapters  Chapter[]
+  questions Question[]
+  exams     Exam[]
+
+  @@map("subjects")
+}
+
+model Chapter {
+  id          Int     @id @default(autoincrement())
+  subjectId   Int     @map("subject_id")
+  name        String  @map("chapter_name")
+  description String?
+  createdBy   Int?    @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  subject     Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  creator     User?        @relation("ChapterCreator", fields: [createdBy], references: [id])
+  subconcepts Subconcept[]
+  questions   Question[]
+
+  @@map("chapters")
+}
+
+model Subconcept {
+  id          Int      @id @default(autoincrement())
+  chapterId   Int      @map("chapter_id")
+  name        String   @map("subconcept_name")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  chapter   Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@map("subconcepts")
+}
+
+// ─── Questions ────────────────────────────────────────────────────────────────
+
+model Question {
+  id           Int        @id @default(autoincrement())
+  subjectId    Int        @map("subject_id")
+  chapterId    Int?       @map("chapter_id")
+  subconceptId Int?       @map("subconcept_id")
+  gradeLevel   String?    @map("grade_level")
+
+  // Question body
+  question      String  @db.Text
+  questionImage String? @map("question_image") // path: /uploads/question-images/...
+
+  // Options (text)
+  optionA String  @map("option_a")
+  optionB String  @map("option_b")
+  optionC String? @map("option_c")
+  optionD String? @map("option_d")
+
+  // Options (images, optional per-option)
+  optionAImage String? @map("option_a_image")
+  optionBImage String? @map("option_b_image")
+  optionCImage String? @map("option_c_image")
+  optionDImage String? @map("option_d_image")
+
+  // Answer
+  correctAnswer    String  @map("correct_answer") // "A" | "B" | "C" | "D" | "A,B" for MSQ
+  isMultipleAnswer Boolean @default(false) @map("is_multiple_answer")
+  explanation      String? @db.Text
+
+  // Metadata
+  marks      Int        @default(1)
+  difficulty Difficulty @default(medium)
+  solutionPdf String?   @map("solution_pdf") // path: /uploads/solution-pdfs/...
+
+  createdBy Int      @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  subject       Subject       @relation(fields: [subjectId], references: [id])
+  chapter       Chapter?      @relation(fields: [chapterId], references: [id])
+  subconcept    Subconcept?   @relation(fields: [subconceptId], references: [id])
+  creator       User          @relation("QuestionCreator", fields: [createdBy], references: [id])
+  examQuestions ExamQuestion[]
+  examAnswers   ExamAnswer[]
+
+  @@map("questions")
+}
+
+// ─── Exams ────────────────────────────────────────────────────────────────────
+
+model Exam {
+  id           Int       @id @default(autoincrement())
+  examName     String    @map("exam_name")
+  description  String?   @db.Text
+  subjectId    Int       @map("subject_id")
+  gradeLevel   String?   @map("grade_level")
+  duration     Int       // minutes
+  totalMarks   Int?      @map("total_marks")
+  passingMarks Int?      @map("passing_marks")
+  scheduleTime DateTime? @map("schedule_time")
+  isActive     Boolean   @default(false) @map("is_active")
+  retakeAllowed Boolean  @default(false) @map("retake_allowed")
+  createdBy    Int       @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  subject      Subject       @relation(fields: [subjectId], references: [id])
+  creator      User          @relation("TeacherExams", fields: [createdBy], references: [id])
+  examQuestions ExamQuestion[]
+  examAttempts  ExamAttempt[]
+
+  @@map("exams")
+}
+
+model ExamQuestion {
+  id         Int @id @default(autoincrement())
+  examId     Int @map("exam_id")
+  questionId Int @map("question_id")
+  marks      Int @default(1)
+
+  exam     Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id])
+
+  @@unique([examId, questionId])
+  @@map("exam_questions")
+}
+
+// ─── Attempts & Results ───────────────────────────────────────────────────────
+
+model ExamAttempt {
+  id          Int       @id @default(autoincrement())
+  examId      Int       @map("exam_id")
+  studentId   Int       @map("student_id")
+  score       Float?    @default(0)
+  startedAt   DateTime  @default(now()) @map("started_at")
+  submittedAt DateTime? @map("submitted_at")
+  isCompleted Boolean   @default(false) @map("is_completed")
+
+  exam    Exam       @relation(fields: [examId], references: [id])
+  student User       @relation(fields: [studentId], references: [id])
+  answers ExamAnswer[]
+
+  @@map("exam_attempts")
+}
+
+model ExamAnswer {
+  id             Int     @id @default(autoincrement())
+  attemptId      Int     @map("attempt_id")
+  questionId     Int     @map("question_id")
+  selectedAnswer String? @map("selected_answer") // "A" | "B" | "A,B" for MSQ
+  isCorrect      Boolean @default(false) @map("is_correct")
+  marksEarned    Float   @default(0) @map("marks_earned")
+
+  attempt  ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id])
+
+  @@map("exam_answers")
 }
