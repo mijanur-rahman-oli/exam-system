@@ -1,83 +1,82 @@
+// app/question-setter/questions/page.tsx
 "use client";
 
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
-import { PlusCircle, Search, Edit2, Trash2, BookOpen } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Filter } from "lucide-react";
+import { useState } from "react";
 
-export default function ManageQuestionsPage() {
+export default function QuestionsListPage() {
   const { toast } = useToast();
-  const qc = useQueryClient();
-  const [search,     setSearch]     = useState("");
-  const [subjFilter, setSubjFilter] = useState("");
-  const [diffFilter, setDiffFilter] = useState("");
-  const [deleting,   setDeleting]   = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [difficulty, setDifficulty] = useState<string>("");
 
-  const { data: questions, isLoading } = useQuery({
-    queryKey: ["my-questions"],
-    queryFn: () => fetch("/api/questions?createdByMe=true").then(r => r.json()),
+  const { data: questions, isLoading, refetch } = useQuery({
+    queryKey: ["qs-questions", search, difficulty],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append("createdByMe", "true");
+      if (search) params.append("search", search);
+      if (difficulty) params.append("difficulty", difficulty);
+      
+      const res = await fetch(`/api/questions?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch questions");
+      return res.json();
+    },
   });
 
-  const { data: subjects } = useQuery({
-    queryKey: ["subjects"],
-    queryFn: () => fetch("/api/subjects").then(r => r.json()),
-  });
-
-  const deleteQ = async (id: number) => {
-    if (!confirm("Delete this question?")) return;
-    setDeleting(id);
-    try {
-      const res = await fetch(`/api/questions/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
-      qc.invalidateQueries({ queryKey: ["my-questions"] });
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/questions/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      return res.json();
+    },
+    onSuccess: () => {
       toast({ title: "Question deleted" });
-    } catch {
-      toast({ title: "Delete failed", variant: "destructive" });
-    } finally { setDeleting(null); }
-  };
-
-  const filtered = (questions ?? []).filter((q: any) => {
-    const matchSearch = !search ||
-      q.question.toLowerCase().includes(search.toLowerCase());
-    const matchSubj = !subjFilter || String(q.subjectId) === subjFilter;
-    const matchDiff = !diffFilter || q.difficulty === diffFilter;
-    return matchSearch && matchSubj && matchDiff;
+      refetch();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
-  const inp: React.CSSProperties = {
-    background: "var(--input-bg)", border: "1.5px solid var(--border)",
-    color: "var(--text)", borderRadius: "0.5rem", outline: "none",
-    fontSize: "0.8rem", padding: "0 0.75rem", height: "2rem",
-    transition: "border-color 0.15s",
+  const difficultyColors = {
+    easy: { bg: "var(--green-bg)", color: "var(--green)" },
+    medium: { bg: "var(--amber-bg)", color: "var(--amber)" },
+    hard: { bg: "var(--red-bg)", color: "var(--red)" },
   };
 
-  const diffStyle: Record<string, { bg: string; color: string }> = {
-    easy:   { bg: "var(--green-bg)", color: "var(--green)" },
-    medium: { bg: "var(--amber-bg)", color: "var(--amber)" },
-    hard:   { bg: "var(--red-bg)",   color: "var(--red)"   },
-  };
+  if (isLoading) {
+    return (
+      <div style={{ padding: "3rem", textAlign: "center", color: "var(--text3)" }}>
+        Loading questions...
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 style={{ fontSize: "1.25rem", fontWeight: 800, margin: 0, color: "var(--text)" }}>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, margin: 0, color: "var(--text)" }}>
             My Questions
           </h1>
-          <p style={{ fontSize: "0.78rem", color: "var(--text3)", margin: 0 }}>
-            {filtered.length} question{filtered.length !== 1 ? "s" : ""}
+          <p style={{ fontSize: "0.85rem", color: "var(--text2)", marginTop: "0.25rem" }}>
+            Manage your question bank
           </p>
         </div>
         <Link href="/question-setter/questions/create">
           <button style={{
-            display: "flex", alignItems: "center", gap: "0.4rem",
-            padding: "0.5rem 1rem", borderRadius: "0.5rem",
-            background: "var(--accent)", border: "none",
-            color: "#fff", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer",
+            padding: "0.6rem 1.2rem", borderRadius: "0.5rem",
+            background: "var(--accent)", border: "none", color: "#fff",
+            fontSize: "0.85rem", fontWeight: 600, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: "0.5rem",
           }}>
-            <PlusCircle size={14} /> Add Question
+            <Plus size={16} /> New Question
           </button>
         </Link>
       </div>
@@ -85,145 +84,161 @@ export default function ManageQuestionsPage() {
       {/* Filters */}
       <div style={{
         background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: "var(--radius)", padding: "0.875rem 1.25rem",
-        display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center",
+        borderRadius: "var(--radius)", padding: "1rem",
+        display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap",
       }}>
-        <div style={{ position: "relative", flex: "1 1 220px" }}>
-          <Search size={13} style={{ position: "absolute", left: "0.6rem", top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search questions…"
-            style={{ ...inp, paddingLeft: "1.85rem", width: "100%", boxSizing: "border-box" }} />
+        <div style={{ flex: 1, position: "relative", minWidth: "200px" }}>
+          <Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
+          <input
+            type="text"
+            placeholder="Search questions..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: "100%", height: "2.4rem", padding: "0 2rem",
+              borderRadius: "0.5rem", border: "1px solid var(--border)",
+              background: "var(--input-bg)", color: "var(--text)",
+              fontSize: "0.85rem", outline: "none",
+            }}
+          />
         </div>
-        <select value={subjFilter} onChange={e => setSubjFilter(e.target.value)}
-          style={{ ...inp, width: "150px", appearance: "none" }}>
-          <option value="">All subjects</option>
-          {subjects?.map((s: any) => <option key={s.id} value={String(s.id)}>{s.name}</option>)}
-        </select>
-        <select value={diffFilter} onChange={e => setDiffFilter(e.target.value)}
-          style={{ ...inp, width: "130px", appearance: "none" }}>
-          <option value="">All difficulties</option>
+        <select
+          value={difficulty}
+          onChange={(e) => setDifficulty(e.target.value)}
+          style={{
+            height: "2.4rem", padding: "0 1rem", borderRadius: "0.5rem",
+            border: "1px solid var(--border)", background: "var(--input-bg)",
+            color: "var(--text)", fontSize: "0.85rem", outline: "none",
+            minWidth: "120px",
+          }}
+        >
+          <option value="">All Difficulties</option>
           <option value="easy">Easy</option>
           <option value="medium">Medium</option>
           <option value="hard">Hard</option>
         </select>
-        {(search || subjFilter || diffFilter) && (
-          <button onClick={() => { setSearch(""); setSubjFilter(""); setDiffFilter(""); }}
-            style={{ ...inp, width: "auto", padding: "0 0.75rem", cursor: "pointer", color: "var(--red)", borderColor: "var(--red)", background: "var(--red-bg)" }}>
-            Clear
-          </button>
-        )}
       </div>
 
-      {/* Table */}
-      <div style={{
-        background: "var(--surface)", border: "1px solid var(--border)",
-        borderRadius: "var(--radius)", overflow: "hidden",
-      }}>
-        {isLoading ? (
-          <div style={{ padding: "3rem", textAlign: "center", color: "var(--text3)" }}>Loading…</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: "3rem", textAlign: "center", color: "var(--text3)", fontSize: "0.85rem" }}>
-            No questions found.{" "}
-            <Link href="/question-setter/questions/create" style={{ color: "var(--accent)" }}>
-              Create one →
-            </Link>
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
-                  {["Question", "Subject", "Chapter", "Difficulty", "Marks", "Type", "Actions"].map(h => (
-                    <th key={h} style={{
-                      padding: "0.65rem 1rem", textAlign: "left",
-                      fontSize: "0.65rem", fontWeight: 700,
-                      color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.07em",
-                      whiteSpace: "nowrap",
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((q: any) => {
-                  const ds = diffStyle[q.difficulty] ?? { bg: "var(--surface2)", color: "var(--text3)" };
-                  return (
-                    <tr key={q.id}
-                      style={{ borderBottom: "1px solid var(--border)", transition: "background 0.12s" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "var(--surface2)")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                    >
-                      <td style={{ padding: "0.8rem 1rem", maxWidth: "320px" }}>
-                        <p style={{
-                          fontSize: "0.8rem", fontWeight: 500, color: "var(--text)", margin: 0,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>{q.question}</p>
-                        {q.questionImage && (
-                          <span style={{ fontSize: "0.62rem", color: "var(--text3)", display: "flex", alignItems: "center", gap: "0.2rem", marginTop: "0.2rem" }}>
-                            <BookOpen size={9} /> has image
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ padding: "0.8rem 1rem", fontSize: "0.78rem", color: "var(--text2)", whiteSpace: "nowrap" }}>
-                        {q.subject?.name ?? "—"}
-                      </td>
-                      <td style={{ padding: "0.8rem 1rem", fontSize: "0.75rem", color: "var(--text3)", whiteSpace: "nowrap" }}>
-                        {q.chapter?.name ?? <span style={{ fontStyle: "italic", color: "var(--text3)" }}>General</span>}
-                      </td>
-                      <td style={{ padding: "0.8rem 1rem" }}>
-                        <span style={{
-                          fontSize: "0.67rem", fontWeight: 700, padding: "0.18rem 0.5rem",
-                          borderRadius: "999px", background: ds.bg, color: ds.color,
-                          textTransform: "capitalize",
-                        }}>{q.difficulty}</span>
-                      </td>
-                      <td style={{ padding: "0.8rem 1rem", fontSize: "0.8rem", fontWeight: 700, color: "var(--accent)" }}>
-                        {q.marks}
-                      </td>
-                      <td style={{ padding: "0.8rem 1rem" }}>
-                        {q.isMultipleAnswer ? (
-                          <span style={{ fontSize: "0.65rem", padding: "0.15rem 0.45rem", borderRadius: "999px", background: "var(--accent-bg)", color: "var(--accent)", border: "1px solid var(--accent-dim)" }}>
-                            MSQ
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>Single</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "0.8rem 1rem" }}>
-                        <div style={{ display: "flex", gap: "0.35rem" }}>
-                          <Link href={`/question-setter/questions/${q.id}/edit`}>
-                            <button style={{
-                              padding: "0.28rem 0.55rem", borderRadius: "0.35rem",
-                              background: "var(--surface2)", border: "1px solid var(--border)",
-                              color: "var(--text2)", cursor: "pointer",
-                              display: "flex", alignItems: "center", gap: "0.25rem",
-                              fontSize: "0.7rem", fontWeight: 600,
-                            }}>
-                              <Edit2 size={11} /> Edit
-                            </button>
-                          </Link>
-                          <button
-                            onClick={() => deleteQ(q.id)}
-                            disabled={deleting === q.id}
-                            style={{
-                              padding: "0.28rem 0.55rem", borderRadius: "0.35rem",
-                              background: "var(--red-bg)", border: "1px solid var(--red)",
-                              color: "var(--red)", cursor: deleting === q.id ? "not-allowed" : "pointer",
-                              display: "flex", alignItems: "center", gap: "0.25rem",
-                              fontSize: "0.7rem", fontWeight: 600,
-                            }}>
-                            <Trash2 size={11} />
-                            {deleting === q.id ? "…" : "Del"}
-                          </button>
+      {/* Questions list */}
+      {!questions?.length ? (
+        <div style={{
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: "var(--radius)", padding: "3rem",
+          textAlign: "center", color: "var(--text3)",
+        }}>
+          No questions yet.{" "}
+          <Link href="/question-setter/questions/create" style={{ color: "var(--accent)" }}>
+            Create your first question
+          </Link>
+        </div>
+      ) : (
+        <div style={{
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: "var(--radius)", overflow: "hidden",
+        }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface2)" }}>
+                <th style={{ padding: "0.75rem 1.25rem", textAlign: "left", fontSize: "0.7rem", fontWeight: 700, color: "var(--text2)" }}>Question</th>
+                <th style={{ padding: "0.75rem 1.25rem", textAlign: "left", fontSize: "0.7rem", fontWeight: 700, color: "var(--text2)" }}>Subject</th>
+                <th style={{ padding: "0.75rem 1.25rem", textAlign: "center", fontSize: "0.7rem", fontWeight: 700, color: "var(--text2)" }}>Difficulty</th>
+                <th style={{ padding: "0.75rem 1.25rem", textAlign: "center", fontSize: "0.7rem", fontWeight: 700, color: "var(--text2)" }}>Marks</th>
+                <th style={{ padding: "0.75rem 1.25rem", textAlign: "right", fontSize: "0.7rem", fontWeight: 700, color: "var(--text2)" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {questions.map((q: any, i: number) => {
+                const colors = difficultyColors[q.difficulty as keyof typeof difficultyColors];
+                return (
+                  <tr key={q.id} style={{
+                    borderBottom: i < questions.length - 1 ? "1px solid var(--border)" : "none",
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface2)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <td style={{ padding: "1rem 1.25rem" }}>
+                      <div style={{ fontSize: "0.85rem", color: "var(--text)", maxWidth: "400px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {q.question}
+                      </div>
+                      {q.chapter && (
+                        <div style={{ fontSize: "0.7rem", color: "var(--text3)", marginTop: "0.25rem" }}>
+                          {q.chapter.name} {q.subconcept && `› ${q.subconcept.name}`}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                      )}
+                    </td>
+                    <td style={{ padding: "1rem 1.25rem", fontSize: "0.8rem", color: "var(--text2)" }}>
+                      {q.subject?.name}
+                    </td>
+                    <td style={{ padding: "1rem 1.25rem", textAlign: "center" }}>
+                      <span style={{
+                        padding: "0.2rem 0.6rem", borderRadius: "999px",
+                        fontSize: "0.7rem", fontWeight: 600,
+                        background: colors.bg, color: colors.color,
+                      }}>
+                        {q.difficulty}
+                      </span>
+                    </td>
+                    <td style={{ padding: "1rem 1.25rem", textAlign: "center", fontSize: "0.8rem", color: "var(--text2)" }}>
+                      {q.marks}
+                    </td>
+                    <td style={{ padding: "1rem 1.25rem", textAlign: "right" }}>
+                      <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                        <Link href={`/question-setter/questions/${q.id}/edit`}>
+                          <button style={{
+                            padding: "0.4rem", borderRadius: "0.375rem",
+                            border: "1px solid var(--border)", background: "none",
+                            color: "var(--text2)", cursor: "pointer",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "var(--accent-bg)";
+                            e.currentTarget.style.borderColor = "var(--accent)";
+                            e.currentTarget.style.color = "var(--accent)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "none";
+                            e.currentTarget.style.borderColor = "var(--border)";
+                            e.currentTarget.style.color = "var(--text2)";
+                          }}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </Link>
+                        <button
+                          onClick={() => {
+                            if (window.confirm("Delete this question? This action cannot be undone.")) {
+                              deleteMutation.mutate(q.id);
+                            }
+                          }}
+                          style={{
+                            padding: "0.4rem", borderRadius: "0.375rem",
+                            border: "1px solid var(--border)", background: "none",
+                            color: "var(--text2)", cursor: "pointer",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "var(--red-bg)";
+                            e.currentTarget.style.borderColor = "var(--red)";
+                            e.currentTarget.style.color = "var(--red)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "none";
+                            e.currentTarget.style.borderColor = "var(--border)";
+                            e.currentTarget.style.color = "var(--text2)";
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -19,9 +19,14 @@ export async function GET(req: NextRequest) {
     }
 
     const chapters = await prisma.chapter.findMany({
-      where:   { subjectId: parseInt(subjectId) },
+      where: { subjectId: parseInt(subjectId) },
       orderBy: { name: "asc" },
-      select:  { id: true, name: true, description: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        subjectId: true,
+      },
     });
 
     return NextResponse.json(chapters);

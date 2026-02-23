@@ -1,120 +1,150 @@
+// components/dashboard/QuestionSetterDashboard.tsx
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { FileQuestion, CheckCircle, Clock, PlusCircle } from "lucide-react";
 import Link from "next/link";
+import { PlusCircle, ClipboardList, BookOpen, TrendingUp, Edit3 } from "lucide-react";
 
-export function QuestionSetterDashboard() {
-  const { data: session } = useSession();
-
+export default function QuestionSetterDashboard() {
   const { data: stats } = useQuery({
     queryKey: ["qs-stats"],
-    queryFn: async () => {
-      const res = await fetch("/api/question-setter/stats");
-      if (!res.ok) throw new Error("Failed to fetch stats");
-      return res.json();
-    },
+    queryFn: () => fetch("/api/question-setter/stats").then(r => r.json()),
   });
 
-  const { data: recentQuestions } = useQuery({
-    queryKey: ["qs-questions"],
-    queryFn: async () => {
-      const res = await fetch("/api/questions?limit=5");
-      if (!res.ok) throw new Error("Failed to fetch questions");
-      return res.json();
-    },
+  const { data: recent } = useQuery({
+    queryKey: ["qs-recent-questions"],
+    queryFn: () => fetch("/api/questions?createdByMe=true&limit=6").then(r => r.json()),
   });
+
+  const diffStyle: Record<string, { bg: string; color: string }> = {
+    easy:   { bg: "var(--green-bg)", color: "var(--green)" },
+    medium: { bg: "var(--amber-bg)", color: "var(--amber)" },
+    hard:   { bg: "var(--red-bg)",   color: "var(--red)"   },
+  };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Question Setter Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back, {session?.user?.username}
-          </p>
-        </div>
-        <Link href="/question-setter/questions">
-          <Button>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add Question
-          </Button>
-        </Link>
+    <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+
+      {/* Header */}
+      <div>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)", margin: 0 }}>
+          Question Setter Dashboard
+        </h1>
+        <p style={{ fontSize: "0.85rem", color: "var(--text2)", marginTop: "0.25rem" }}>
+          Create and manage your question bank
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Questions</CardTitle>
-            <FileQuestion className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalQuestions ?? 0}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Easy</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.easyCount ?? 0}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hard</CardTitle>
-            <Clock className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.hardCount ?? 0}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Questions</CardTitle>
-          <CardDescription>Last 5 questions you created</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {recentQuestions?.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No questions yet.{" "}
-              <Link href="/question-setter/questions" className="text-blue-600 hover:underline">
-                Create your first question
-              </Link>
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {recentQuestions?.map((q: any) => (
-                <div key={q.id} className="flex items-center justify-between border rounded-lg p-3">
-                  <div className="flex-1 min-w-0 mr-4">
-                    <p className="font-medium truncate">{q.question}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {q.subject?.name} · {q.marks} mark{q.marks !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${
-                    q.difficulty === "easy"
-                      ? "bg-green-100 text-green-800"
-                      : q.difficulty === "medium"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-red-100 text-red-800"
-                  }`}>
-                    {q.difficulty}
-                  </span>
-                </div>
-              ))}
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem" }}>
+        {[
+          { label: "Questions Written",  value: stats?.total ?? 0,    icon: BookOpen,    color: "var(--accent)", bg: "var(--accent-bg)" },
+          { label: "This Month",         value: stats?.thisMonth ?? 0, icon: TrendingUp,  color: "var(--green)",  bg: "var(--green-bg)"  },
+          { label: "Subjects Covered",   value: stats?.subjects ?? 0, icon: ClipboardList, color: "var(--amber)", bg: "var(--amber-bg)" },
+        ].map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: "var(--radius)", padding: "1.25rem",
+            display: "flex", gap: "1rem", alignItems: "center",
+          }}>
+            <div style={{ width: "2.25rem", height: "2.25rem", borderRadius: "0.5rem", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon size={16} color={color} />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div>
+              <div style={{ fontSize: "1.6rem", fontWeight: 900, color: "var(--text)", lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: "0.72rem", color: "var(--text2)", marginTop: "0.2rem" }}>{label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div>
+        <h2 style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text2)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.75rem" }}>
+          Quick Actions
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: "0.875rem" }}>
+          {[
+            { href: "/question-setter/questions/create", label: "Add New Question",    Icon: PlusCircle,    desc: "Write a new question with LaTeX & images" },
+            { href: "/question-setter/questions",        label: "Browse My Questions", Icon: ClipboardList, desc: "View, filter, and manage your questions"    },
+          ].map(({ href, label, Icon, desc }) => (
+            <Link key={href} href={href} style={{ textDecoration: "none" }}>
+              <div style={{
+                background: "var(--surface)", border: "1px solid var(--border)",
+                borderRadius: "var(--radius)", padding: "1.1rem",
+                cursor: "pointer", transition: "all 0.15s",
+                display: "flex", flexDirection: "column", gap: "0.6rem",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "var(--shadow)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <Icon size={18} color="var(--accent)" />
+                <div>
+                  <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text)" }}>{label}</div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--text3)", marginTop: "0.2rem" }}>{desc}</div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent questions */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+          <h2 style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text2)", textTransform: "uppercase", letterSpacing: "0.08em", margin: 0 }}>
+            Recent Questions
+          </h2>
+          <Link href="/question-setter/questions" style={{ fontSize: "0.75rem", color: "var(--accent)", textDecoration: "none" }}>View all →</Link>
+        </div>
+
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+          {!recent?.length ? (
+            <div style={{ padding: "2.5rem", textAlign: "center", color: "var(--text3)", fontSize: "0.85rem" }}>
+              No questions yet —{" "}
+              <Link href="/question-setter/questions/create" style={{ color: "var(--accent)" }}>create your first one</Link>
+            </div>
+          ) : recent.map((q: any, i: number) => {
+            const ds = diffStyle[q.difficulty] ?? { bg: "var(--surface2)", color: "var(--text3)" };
+            return (
+              <div key={q.id} style={{
+                padding: "0.875rem 1.25rem",
+                borderBottom: i < recent.length - 1 ? "1px solid var(--border)" : "none",
+                display: "flex", alignItems: "flex-start", gap: "0.875rem",
+                transition: "background 0.12s",
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--surface2)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    fontSize: "0.82rem", color: "var(--text)", margin: 0,
+                    lineHeight: 1.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {q.question}
+                  </p>
+                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.35rem", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "0.65rem", padding: "0.12rem 0.4rem", borderRadius: "999px", background: ds.bg, color: ds.color }}>{q.difficulty}</span>
+                    {q.subject?.name && <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>{q.subject.name}</span>}
+                    {q.chapter?.name && <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>· {q.chapter.name}</span>}
+                    <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>· {q.marks} pt{q.marks !== 1 ? "s" : ""}</span>
+                  </div>
+                </div>
+                <Link href={`/question-setter/questions/${q.id}/edit`}>
+                  <button style={{
+                    flexShrink: 0, background: "none", border: "1px solid var(--border)",
+                    borderRadius: "0.375rem", padding: "0.28rem 0.55rem",
+                    color: "var(--text2)", cursor: "pointer", display: "flex", alignItems: "center",
+                    gap: "0.25rem", fontSize: "0.7rem",
+                  }}>
+                    <Edit3 size={11} /> Edit
+                  </button>
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

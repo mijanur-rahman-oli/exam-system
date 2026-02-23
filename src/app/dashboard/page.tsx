@@ -12,7 +12,6 @@ export default async function DashboardPage() {
   const role = session.user.role;
 
   if (role === "admin") redirect("/admin");
-  if (role === "teacher") redirect("/teacher");
   if (role === "question_setter") redirect("/question-setter");
   if (role === "student") redirect("/student");
 

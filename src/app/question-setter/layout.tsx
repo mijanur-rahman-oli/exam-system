@@ -1,3 +1,4 @@
+// app/question-setter/layout.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,10 +6,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Sun, Moon, Menu, X, LayoutDashboard,
-  PlusCircle, ClipboardList, LogOut,
+  ClipboardList, LogOut,
 } from "lucide-react";
 
-// ─── Shared theme (same key as teacher so both portals sync) ──────────────────
 export function useTheme() {
   const [dark, setDark] = useState(true);
   useEffect(() => {
@@ -72,8 +72,8 @@ export function themeVars(dark: boolean): React.CSSProperties {
 }
 
 const NAV = [
-  { href: "/question-setter",                   label: "Dashboard",      Icon: LayoutDashboard },
-  { href: "/question-setter/questions",         label: "My Questions",   Icon: ClipboardList   },
+  { href: "/question-setter",        label: "Dashboard",    Icon: LayoutDashboard },
+  { href: "/question-setter/questions", label: "My Questions", Icon: ClipboardList },
 ];
 
 export default function QuestionSetterLayout({ children }: { children: React.ReactNode }) {
@@ -97,14 +97,14 @@ export default function QuestionSetterLayout({ children }: { children: React.Rea
         background: "var(--bg)",
         color: "var(--text)",
         display: "flex",
-        fontFamily: "'Sora','DM Sans',system-ui,sans-serif",
+        fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <aside
         className="qs-sidebar"
         style={{
-          width: "220px",
+          width: "240px",
           flexShrink: 0,
           background: "var(--surface)",
           borderRight: "1px solid var(--border)",
@@ -115,22 +115,23 @@ export default function QuestionSetterLayout({ children }: { children: React.Rea
           height: "100vh",
           zIndex: 40,
           transition: "transform 0.22s ease",
+          transform: sideOpen ? "translateX(0)" : "translateX(-100%)",
         }}
       >
         {/* Logo */}
-        <div style={{ padding: "1.25rem 1.25rem 1rem", borderBottom: "1px solid var(--border)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <div style={{ padding: "1.5rem 1.25rem 1rem", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <div style={{
-              width: "2rem", height: "2rem", borderRadius: "0.5rem",
+              width: "2.25rem", height: "2.25rem", borderRadius: "0.5rem",
               background: "var(--accent-bg)", border: "1.5px solid var(--accent)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "0.85rem", fontWeight: 900, color: "var(--accent)",
+              fontSize: "0.9rem", fontWeight: 900, color: "var(--accent)",
             }}>Q</div>
             <div>
-              <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.05em", color: "var(--text)" }}>
-                Question
+              <div style={{ fontSize: "0.8rem", fontWeight: 800, color: "var(--text)" }}>
+                Question Bank
               </div>
-              <div style={{ fontSize: "0.6rem", color: "var(--text3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              <div style={{ fontSize: "0.6rem", color: "var(--text3)" }}>
                 Setter Portal
               </div>
             </div>
@@ -138,35 +139,23 @@ export default function QuestionSetterLayout({ children }: { children: React.Rea
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+        <nav style={{ flex: 1, padding: "1rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
           {NAV.map(({ href, label, Icon }) => {
             const active = isActive(href);
             return (
               <Link key={href} href={href} style={{ textDecoration: "none" }}>
                 <div
                   style={{
-                    display: "flex", alignItems: "center", gap: "0.65rem",
-                    padding: "0.55rem 0.75rem", borderRadius: "0.5rem",
-                    fontSize: "0.8rem", fontWeight: active ? 700 : 500,
+                    display: "flex", alignItems: "center", gap: "0.75rem",
+                    padding: "0.6rem 0.75rem", borderRadius: "0.5rem",
+                    fontSize: "0.85rem", fontWeight: active ? 600 : 400,
                     background: active ? "var(--accent-bg)" : "transparent",
                     color: active ? "var(--accent)" : "var(--text2)",
                     border: active ? "1px solid var(--accent-dim)" : "1px solid transparent",
                     cursor: "pointer", transition: "all 0.15s",
                   }}
-                  onMouseEnter={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = "var(--surface2)";
-                      e.currentTarget.style.color = "var(--text)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "var(--text2)";
-                    }
-                  }}
                 >
-                  <Icon size={15} />
+                  <Icon size={16} />
                   {label}
                 </div>
               </Link>
@@ -175,32 +164,32 @@ export default function QuestionSetterLayout({ children }: { children: React.Rea
         </nav>
 
         {/* Bottom */}
-        <div style={{ padding: "0.75rem", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        <div style={{ padding: "1rem", borderTop: "1px solid var(--border)" }}>
           <button
             onClick={toggle}
             style={{
-              display: "flex", alignItems: "center", gap: "0.6rem",
-              padding: "0.5rem 0.75rem", borderRadius: "0.5rem",
+              display: "flex", alignItems: "center", gap: "0.75rem",
+              padding: "0.6rem 0.75rem", borderRadius: "0.5rem",
               background: "var(--surface2)", border: "1px solid var(--border)",
-              color: "var(--text2)", cursor: "pointer", fontSize: "0.78rem",
-              width: "100%", transition: "all 0.15s",
+              color: "var(--text2)", cursor: "pointer", fontSize: "0.85rem",
+              width: "100%", transition: "all 0.15s", marginBottom: "0.5rem",
             }}
           >
-            {dark ? <Sun size={13} /> : <Moon size={13} />}
+            {dark ? <Sun size={16} /> : <Moon size={16} />}
             {dark ? "Light mode" : "Dark mode"}
           </button>
           <Link href="/api/auth/signout" style={{ textDecoration: "none" }}>
             <div
               style={{
-                display: "flex", alignItems: "center", gap: "0.6rem",
-                padding: "0.5rem 0.75rem", borderRadius: "0.5rem",
-                color: "var(--red)", cursor: "pointer", fontSize: "0.78rem",
+                display: "flex", alignItems: "center", gap: "0.75rem",
+                padding: "0.6rem 0.75rem", borderRadius: "0.5rem",
+                color: "var(--red)", cursor: "pointer", fontSize: "0.85rem",
                 transition: "all 0.15s",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "var(--red-bg)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
-              <LogOut size={13} /> Logout
+              <LogOut size={16} /> Logout
             </div>
           </Link>
         </div>
@@ -214,8 +203,8 @@ export default function QuestionSetterLayout({ children }: { children: React.Rea
         />
       )}
 
-      {/* ── Main area ── */}
-      <div className="qs-main" style={{ flex: 1, marginLeft: "220px", display: "flex", flexDirection: "column" }}>
+      {/* Main area */}
+      <div className="qs-main" style={{ flex: 1, marginLeft: "240px", display: "flex", flexDirection: "column" }}>
         {/* Mobile top bar */}
         <div
           className="qs-topbar"
@@ -249,8 +238,11 @@ export default function QuestionSetterLayout({ children }: { children: React.Rea
       </div>
 
       <style>{`
+        @media (min-width: 769px) {
+          .qs-sidebar { transform: translateX(0) !important; }
+        }
         @media (max-width: 768px) {
-          .qs-sidebar  { transform: translateX(-100%); }
+          .qs-sidebar { transform: translateX(-100%); }
           .qs-sidebar.open { transform: translateX(0); }
           .qs-main     { margin-left: 0 !important; }
           .qs-topbar   { display: flex !important; }

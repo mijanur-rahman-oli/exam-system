@@ -19,9 +19,14 @@ export async function GET(req: NextRequest) {
     }
 
     const subconcepts = await prisma.subconcept.findMany({
-      where:   { chapterId: parseInt(chapterId) },
+      where: { chapterId: parseInt(chapterId) },
       orderBy: { name: "asc" },
-      select:  { id: true, name: true, description: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        chapterId: true,
+      },
     });
 
     return NextResponse.json(subconcepts);

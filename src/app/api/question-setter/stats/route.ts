@@ -1,3 +1,4 @@
+// app/api/question-setter/stats/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -11,15 +12,32 @@ export async function GET() {
     }
 
     const createdBy = parseInt(session.user.id);
+    
+    // Get start of current month
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
 
-    const [totalQuestions, easyCount, mediumCount, hardCount] = await Promise.all([
+    const [total, thisMonth, subjects] = await Promise.all([
       prisma.question.count({ where: { createdBy } }),
-      prisma.question.count({ where: { createdBy, difficulty: "easy" } }),
-      prisma.question.count({ where: { createdBy, difficulty: "medium" } }),
-      prisma.question.count({ where: { createdBy, difficulty: "hard" } }),
+      prisma.question.count({ 
+        where: { 
+          createdBy,
+          createdAt: { gte: startOfMonth }
+        } 
+      }),
+      prisma.question.findMany({
+        where: { createdBy },
+        select: { subjectId: true },
+        distinct: ["subjectId"],
+      }),
     ]);
 
-    return NextResponse.json({ totalQuestions, easyCount, mediumCount, hardCount });
+    return NextResponse.json({ 
+      total, 
+      thisMonth,
+      subjects: subjects.length 
+    });
   } catch (error) {
     console.error("QS stats error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
