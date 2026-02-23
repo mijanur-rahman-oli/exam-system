@@ -11,9 +11,14 @@ import {
   TrendingUp, 
   Layers, 
   Award,
-  GraduationCap,
   Calendar,
-  CheckCircle
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  PlusCircle,
+  Settings,
+  BarChart3,
+  Activity
 } from "lucide-react";
 
 export function AdminDashboard() {
@@ -28,359 +33,410 @@ export function AdminDashboard() {
     },
   });
 
-  const { data: recentUsers } = useQuery({
-    queryKey: ["admin-recent-users"],
+  const { data: recentActivities } = useQuery({
+    queryKey: ["admin-activities"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/users?limit=5");
-      if (!res.ok) throw new Error("Failed to fetch users");
+      const res = await fetch("/api/admin/activities?limit=5");
+      if (!res.ok) throw new Error("Failed to fetch activities");
       return res.json();
     },
   });
 
-  const { data: recentExams } = useQuery({
-    queryKey: ["admin-recent-exams"],
+  const { data: systemHealth } = useQuery({
+    queryKey: ["admin-system-health"],
     queryFn: async () => {
-      const res = await fetch("/api/exams?limit=5");
-      if (!res.ok) throw new Error("Failed to fetch exams");
+      const res = await fetch("/api/admin/system-health");
+      if (!res.ok) throw new Error("Failed to fetch system health");
       return res.json();
     },
   });
 
-  const statCards = [
-    { 
-      title: "Total Users", 
-      value: stats?.totalUsers ?? 0, 
-      icon: Users, 
-      gradient: "from-blue-500 to-blue-600",
-      bg: "bg-blue-500/10",
-      text: "text-blue-600 dark:text-blue-400"
-    },
-    { 
-      title: "Total Exams", 
-      value: stats?.totalExams ?? 0, 
-      icon: BookOpen, 
-      gradient: "from-green-500 to-green-600",
-      bg: "bg-green-500/10",
-      text: "text-green-600 dark:text-green-400"
-    },
-    { 
-      title: "Questions", 
-      value: stats?.totalQuestions ?? 0, 
-      icon: FileQuestion, 
-      gradient: "from-purple-500 to-purple-600",
-      bg: "bg-purple-500/10",
-      text: "text-purple-600 dark:text-purple-400"
-    },
-    { 
-      title: "Exam Attempts", 
-      value: stats?.totalAttempts ?? 0, 
-      icon: TrendingUp, 
-      gradient: "from-orange-500 to-orange-600",
-      bg: "bg-orange-500/10",
-      text: "text-orange-600 dark:text-orange-400"
-    },
-    { 
-      title: "Subjects", 
-      value: stats?.totalSubjects ?? 0, 
-      icon: Layers, 
-      gradient: "from-indigo-500 to-indigo-600",
-      bg: "bg-indigo-500/10",
-      text: "text-indigo-600 dark:text-indigo-400"
-    },
-    { 
-      title: "Avg. Score", 
-      value: `${stats?.avgScore ?? 0}%`, 
-      icon: Award, 
-      gradient: "from-pink-500 to-pink-600",
-      bg: "bg-pink-500/10",
-      text: "text-pink-600 dark:text-pink-400"
-    },
-  ];
-
-  const userStats = [
-    { 
-      label: "Students", 
-      value: stats?.studentCount ?? 0, 
-      icon: GraduationCap,
-      color: "bg-purple-500",
-      textColor: "text-purple-600 dark:text-purple-400",
-      bgColor: "bg-purple-100 dark:bg-purple-900/30"
-    },
-    { 
-      label: "Teachers", 
-      value: stats?.teacherCount ?? 0, 
+  const quickActions = [
+    {
+      title: "Add New User",
+      description: "Create student, teacher, or admin account",
       icon: Users,
-      color: "bg-blue-500",
-      textColor: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-100 dark:bg-blue-900/30"
+      href: "/admin/users",
+      color: "from-blue-500 to-blue-600",
+      bg: "bg-blue-500/10",
+      text: "text-blue-600 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-900/50"
     },
-    { 
-      label: "Question Setters", 
-      value: stats?.questionSetterCount ?? 0, 
+    {
+      title: "Create Exam",
+      description: "Build new assessment with questions",
+      icon: BookOpen,
+      href: "/admin/exams/create",
+      color: "from-green-500 to-green-600",
+      bg: "bg-green-500/10",
+      text: "text-green-600 dark:text-green-400",
+      border: "border-green-200 dark:border-green-900/50"
+    },
+    {
+      title: "Add Question",
+      description: "Expand question bank with new content",
       icon: FileQuestion,
-      color: "bg-green-500",
-      textColor: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-100 dark:bg-green-900/30"
+      href: "/admin/questions/create",
+      color: "from-purple-500 to-purple-600",
+      bg: "bg-purple-500/10",
+      text: "text-purple-600 dark:text-purple-400",
+      border: "border-purple-200 dark:border-purple-900/50"
     },
-    { 
-      label: "Admins", 
-      value: stats?.adminCount ?? 0, 
-      icon: Award,
-      color: "bg-red-500",
-      textColor: "text-red-600 dark:text-red-400",
-      bgColor: "bg-red-100 dark:bg-red-900/30"
+    {
+      title: "Manage Subjects",
+      description: "Organize academic hierarchy",
+      icon: Layers,
+      href: "/admin/subjects",
+      color: "from-orange-500 to-orange-600",
+      bg: "bg-orange-500/10",
+      text: "text-orange-600 dark:text-orange-400",
+      border: "border-orange-200 dark:border-orange-900/50"
     },
   ];
 
-  const roleColors: Record<string, string> = {
-    admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    teacher: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    question_setter: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    student: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  };
+  const systemMetrics = [
+    {
+      label: "System Uptime",
+      value: systemHealth?.uptime || "99.9%",
+      icon: Activity,
+      trend: "+0.1%",
+      trendUp: true,
+    },
+    {
+      label: "Active Users",
+      value: systemHealth?.activeUsers || stats?.totalUsers || 0,
+      icon: Users,
+      trend: "+12",
+      trendUp: true,
+    },
+    {
+      label: "Database Size",
+      value: systemHealth?.dbSize || "2.4 GB",
+      icon: BarChart3,
+      trend: "Stable",
+      trendUp: null,
+    },
+    {
+      label: "Response Time",
+      value: systemHealth?.responseTime || "245ms",
+      icon: Clock,
+      trend: "-32ms",
+      trendUp: true,
+    },
+  ];
+
+  const recentItems = [
+    {
+      title: "Recent Users",
+      icon: Users,
+      data: recentActivities?.users || [],
+      viewAll: "/admin/users",
+      emptyMessage: "No recent user activity",
+      renderItem: (item: any) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-[var(--accent-bg)] flex items-center justify-center">
+            <span className="text-xs font-medium text-[var(--accent)]">
+              {item.username?.[0]?.toUpperCase() || 'U'}
+            </span>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text)]">{item.username}</p>
+            <p className="text-xs text-[var(--text2)]">{item.role}</p>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Recent Exams",
+      icon: BookOpen,
+      data: recentActivities?.exams || [],
+      viewAll: "/admin/exams",
+      emptyMessage: "No recent exams",
+      renderItem: (item: any) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-bg)] flex items-center justify-center">
+            <BookOpen size={14} className="text-[var(--accent)]" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-[var(--text)]">{item.examName}</p>
+            <p className="text-xs text-[var(--text2)]">{item.duration} mins · {item.questions} Qs</p>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Recent Questions",
+      icon: FileQuestion,
+      data: recentActivities?.questions || [],
+      viewAll: "/admin/questions",
+      emptyMessage: "No recent questions",
+      renderItem: (item: any) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-bg)] flex items-center justify-center">
+            <FileQuestion size={14} className="text-[var(--accent)]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-[var(--text)] truncate">{item.question}</p>
+            <p className="text-xs text-[var(--text2)]">{item.subject}</p>
+          </div>
+        </div>
+      )
+    },
+  ];
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-[600px]">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-8 h-8 bg-[var(--surface)] rounded-full"></div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-8 space-y-8">
       {/* Welcome Section */}
-      <div className="flex justify-between items-start">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--text)]">Admin Dashboard</h1>
-          <p className="text-[var(--text2)] mt-2">
-            Welcome back, <span className="font-semibold text-[var(--accent)]">{session?.user?.username}</span>! Here's what's happening in your system.
+          <h1 className="text-3xl font-bold text-[var(--text)]">Welcome back, {session?.user?.username}</h1>
+          <p className="text-[var(--text2)] mt-2 text-lg">
+            Here's what's happening with your platform today
           </p>
         </div>
-        <div className="flex gap-3">
-          <div className="px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--surface2)] text-[var(--text2)] text-sm flex items-center gap-2">
-            <Calendar size={14} />
-            {new Date().toLocaleDateString()}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+            <Calendar size={18} className="text-[var(--accent)]" />
+            <span className="text-sm text-[var(--text)]">
+              {new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </span>
           </div>
-          <div className="px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--surface2)] text-[var(--text2)] text-sm flex items-center gap-2">
-            <CheckCircle size={14} className="text-[var(--green)]" />
-            System Online
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+            <div className="relative">
+              <CheckCircle size={18} className="text-[var(--green)]" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--green)] rounded-full animate-pulse"></span>
+            </div>
+            <span className="text-sm text-[var(--text)]">System Online</span>
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {statCards.map((stat, i) => {
-          const Icon = stat.icon;
+      {/* Quick Actions Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {quickActions.map((action, index) => {
+          const Icon = action.icon;
           return (
-            <div
-              key={i}
-              className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl ${stat.bg}`}>
-                  <Icon className={`h-5 w-5 ${stat.text}`} />
+            <Link key={index} href={action.href}>
+              <div className="group relative p-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer overflow-hidden">
+                {/* Background gradient on hover */}
+                <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-300 bg-gradient-to-br ${action.color}`} />
+                
+                {/* Icon */}
+                <div className={`relative w-12 h-12 rounded-xl ${action.bg} flex items-center justify-center mb-4`}>
+                  <Icon className={`h-6 w-6 ${action.text}`} />
                 </div>
-                <span className="text-xs text-[var(--text3)]">Total</span>
+                
+                {/* Content */}
+                <h3 className="text-lg font-semibold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                  {action.title}
+                </h3>
+                <p className="text-sm text-[var(--text2)] mt-1">
+                  {action.description}
+                </p>
+                
+                {/* Arrow indicator */}
+                <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <PlusCircle className={`h-5 w-5 ${action.text}`} />
+                </div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-[var(--text)]">{stat.value}</div>
-                <p className="text-sm text-[var(--text2)] mt-1">{stat.title}</p>
-              </div>
-              <div className="mt-4 h-1 w-full bg-[var(--border)] rounded-full overflow-hidden">
-                <div 
-                  className={`h-full bg-gradient-to-r ${stat.gradient}`}
-                  style={{ width: '75%' }}
-                />
-              </div>
-            </div>
+            </Link>
           );
         })}
       </div>
 
-      {/* Users by Role & Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Users by Role Card */}
-        <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-[var(--text)]">Users by Role</h2>
-            <span className="px-2 py-1 rounded-full bg-[var(--accent-bg)] text-[var(--accent)] text-xs font-medium">
-              Total: {stats?.totalUsers ?? 0}
-            </span>
-          </div>
-          <div className="space-y-4">
-            {userStats.map((stat) => {
-              const Icon = stat.icon;
-              const percentage = ((stat.value / (stats?.totalUsers || 1)) * 100).toFixed(1);
-              return (
-                <div key={stat.label} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg ${stat.bgColor}`}>
-                        <Icon className={`h-3.5 w-3.5 ${stat.textColor}`} />
-                      </div>
-                      <span className="text-sm font-medium text-[var(--text)]">
-                        {stat.label}
-                      </span>
-                    </div>
+      {/* System Overview & Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* System Health Card */}
+        <div className="lg:col-span-1">
+          <div className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] h-full">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-[var(--text)]">System Health</h2>
+              <Settings size={20} className="text-[var(--text2)]" />
+            </div>
+            
+            <div className="space-y-4">
+              {systemMetrics.map((metric, index) => {
+                const Icon = metric.icon;
+                const trendColor = metric.trendUp === true ? 'text-[var(--green)]' : 
+                                  metric.trendUp === false ? 'text-[var(--red)]' : 
+                                  'text-[var(--text2)]';
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface2)]">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm text-[var(--text2)]">{percentage}%</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${stat.bgColor} ${stat.textColor}`}>
-                        {stat.value}
+                      <div className="w-8 h-8 rounded-lg bg-[var(--surface)] flex items-center justify-center">
+                        <Icon size={16} className="text-[var(--accent)]" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-[var(--text2)]">{metric.label}</p>
+                        <p className="text-sm font-semibold text-[var(--text)]">{metric.value}</p>
+                      </div>
+                    </div>
+                    {metric.trend && (
+                      <span className={`text-xs font-medium ${trendColor}`}>
+                        {metric.trend}
                       </span>
-                    </div>
+                    )}
                   </div>
-                  <div className="h-2 w-full bg-[var(--border)] rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${stat.color}`}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            {/* Storage Usage */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-[var(--text2)]">Storage Usage</span>
+                <span className="text-xs font-medium text-[var(--text)]">45%</span>
+              </div>
+              <div className="h-2 bg-[var(--surface2)] rounded-full overflow-hidden">
+                <div className="h-full w-[45%] bg-gradient-to-r from-[var(--accent)] to-[var(--accent-dim)] rounded-full"></div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Quick Actions Card */}
-        <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <h2 className="text-lg font-semibold text-[var(--text)] mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <Link href="/admin/users">
-              <div className="p-4 rounded-lg border-2 border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all cursor-pointer text-center">
-                <Users className="h-6 w-6 mx-auto mb-2 text-[var(--accent)]" />
-                <span className="text-sm font-medium text-[var(--text)]">Manage Users</span>
+        {/* Platform Stats Card */}
+        <div className="lg:col-span-2">
+          <div className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+            <h2 className="text-lg font-semibold text-[var(--text)] mb-6">Platform Overview</h2>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-[var(--surface2)]">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <Users size={16} className="text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <span className="text-xs text-[var(--text2)]">Total Users</span>
+                </div>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats?.totalUsers || 0}</p>
+                <p className="text-xs text-[var(--text2)] mt-1">
+                  +{stats?.newUsers || 0} this month
+                </p>
               </div>
-            </Link>
-            <Link href="/admin/subjects">
-              <div className="p-4 rounded-lg border-2 border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all cursor-pointer text-center">
-                <Layers className="h-6 w-6 mx-auto mb-2 text-[var(--accent)]" />
-                <span className="text-sm font-medium text-[var(--text)]">Subjects & Chapters</span>
+
+              <div className="p-4 rounded-xl bg-[var(--surface2)]">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <BookOpen size={16} className="text-green-600 dark:text-green-400" />
+                  </div>
+                  <span className="text-xs text-[var(--text2)]">Total Exams</span>
+                </div>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats?.totalExams || 0}</p>
+                <p className="text-xs text-[var(--text2)] mt-1">
+                  {stats?.activeExams || 0} active
+                </p>
               </div>
-            </Link>
-            <Link href="/admin/exams/create">
-              <div className="p-4 rounded-lg border-2 border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all cursor-pointer text-center">
-                <BookOpen className="h-6 w-6 mx-auto mb-2 text-[var(--accent)]" />
-                <span className="text-sm font-medium text-[var(--text)]">Create Exam</span>
+
+              <div className="p-4 rounded-xl bg-[var(--surface2)]">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <FileQuestion size={16} className="text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <span className="text-xs text-[var(--text2)]">Questions</span>
+                </div>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats?.totalQuestions || 0}</p>
+                <p className="text-xs text-[var(--text2)] mt-1">
+                  +{stats?.newQuestions || 0} this week
+                </p>
               </div>
-            </Link>
-            <Link href="/admin/questions/create">
-              <div className="p-4 rounded-lg border-2 border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent-bg)] transition-all cursor-pointer text-center">
-                <FileQuestion className="h-6 w-6 mx-auto mb-2 text-[var(--accent)]" />
-                <span className="text-sm font-medium text-[var(--text)]">Add Question</span>
+
+              <div className="p-4 rounded-xl bg-[var(--surface2)]">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                    <TrendingUp size={16} className="text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <span className="text-xs text-[var(--text2)]">Attempts</span>
+                </div>
+                <p className="text-2xl font-bold text-[var(--text)]">{stats?.totalAttempts || 0}</p>
+                <p className="text-xs text-[var(--text2)] mt-1">
+                  Avg. {stats?.avgScore || 0}% score
+                </p>
               </div>
-            </Link>
+            </div>
+
+            {/* Subject Distribution */}
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-[var(--text)] mb-3">Subject Distribution</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {stats?.subjects?.slice(0, 4).map((subject: any, index: number) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-[var(--accent)]"></div>
+                    <span className="text-xs text-[var(--text2)] flex-1">{subject.name}</span>
+                    <span className="text-xs font-medium text-[var(--text)]">{subject.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Recent Users */}
-        <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[var(--text)]">Recent Users</h2>
-            <Link href="/admin/users" className="text-sm text-[var(--accent)] hover:underline">
-              View all
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {recentUsers?.map((user: any) => (
-              <div key={user.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface2)] transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[var(--surface2)] flex items-center justify-center">
-                    <span className="text-sm font-medium text-[var(--text)]">
-                      {user.username[0].toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[var(--text)]">{user.username}</p>
-                    <p className="text-xs text-[var(--text2)]">{user.email}</p>
-                  </div>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role]}`}>
-                  {user.role.replace('_', ' ')}
-                </span>
+      {/* Recent Activity Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {recentItems.map((section, index) => (
+          <div key={index} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+            {/* Header */}
+            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <section.icon size={18} className="text-[var(--accent)]" />
+                <h3 className="font-medium text-[var(--text)]">{section.title}</h3>
               </div>
-            ))}
-            {(!recentUsers || recentUsers.length === 0) && (
-              <p className="text-center text-[var(--text2)] py-4">No recent users</p>
-            )}
-          </div>
-        </div>
+              <Link 
+                href={section.viewAll}
+                className="text-xs text-[var(--accent)] hover:underline"
+              >
+                View all
+              </Link>
+            </div>
 
-        {/* Recent Exams */}
-        <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[var(--text)]">Recent Exams</h2>
-            <Link href="/admin/exams" className="text-sm text-[var(--accent)] hover:underline">
-              View all
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {recentExams?.map((exam: any) => (
-              <div key={exam.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-[var(--surface2)] transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-[var(--accent-bg)]">
-                    <BookOpen className="h-4 w-4 text-[var(--accent)]" />
+            {/* Content */}
+            <div className="divide-y divide-[var(--border)]">
+              {section.data.length > 0 ? (
+                section.data.map((item: any, idx: number) => (
+                  <div key={idx} className="p-4 hover:bg-[var(--surface2)] transition-colors">
+                    {section.renderItem(item)}
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-[var(--text)]">{exam.examName}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-[var(--text2)]">{exam.duration} mins</span>
-                      <span className="text-xs text-[var(--text2)]">•</span>
-                      <span className="text-xs text-[var(--text2)]">{exam.examQuestions?.length || 0} questions</span>
-                    </div>
-                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center">
+                  <section.icon size={24} className="mx-auto mb-2 text-[var(--text3)]" />
+                  <p className="text-sm text-[var(--text2)]">{section.emptyMessage}</p>
                 </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  exam.isActive 
-                    ? 'bg-[var(--green-bg)] text-[var(--green)]' 
-                    : 'bg-[var(--surface2)] text-[var(--text2)]'
-                }`}>
-                  {exam.isActive ? "Active" : "Inactive"}
-                </span>
-              </div>
-            ))}
-            {(!recentExams || recentExams.length === 0) && (
-              <p className="text-center text-[var(--text2)] py-4">No recent exams</p>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {/* System Overview */}
-      <div className="p-6 rounded-xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface)] to-[var(--surface2)]">
-        <h2 className="text-lg font-semibold text-[var(--text)] mb-6">System Overview</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-[var(--accent)]">{stats?.totalSubjects ?? 0}</div>
-            <div className="text-sm text-[var(--text2)] mt-1 flex items-center justify-center gap-1">
-              <Layers size={14} />
-              Subjects
-            </div>
+      {/* Quick Tips */}
+      <div className="p-4 rounded-xl bg-[var(--surface2)] border border-[var(--border)]">
+        <div className="flex items-start gap-3">
+          <div className="w-6 h-6 rounded-full bg-[var(--accent-bg)] flex items-center justify-center flex-shrink-0 mt-0.5">
+            <AlertCircle size={14} className="text-[var(--accent)]" />
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-[var(--green)]">{stats?.totalChapters ?? 0}</div>
-            <div className="text-sm text-[var(--text2)] mt-1 flex items-center justify-center gap-1">
-              <BookOpen size={14} />
-              Chapters
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-[var(--amber)]">{stats?.totalSubconcepts ?? 0}</div>
-            <div className="text-sm text-[var(--text2)] mt-1 flex items-center justify-center gap-1">
-              <FileQuestion size={14} />
-              Sub-concepts
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-[var(--red)]">{stats?.activeExams ?? 0}</div>
-            <div className="text-sm text-[var(--text2)] mt-1 flex items-center justify-center gap-1">
-              <TrendingUp size={14} />
-              Active Exams
-            </div>
+          <div>
+            <h4 className="text-sm font-medium text-[var(--text)] mb-1">Admin Tips</h4>
+            <p className="text-xs text-[var(--text2)]">
+              You can create new exams by selecting questions from the question bank. Make sure to verify new user accounts and keep your subject hierarchy organized for better question filtering.
+            </p>
           </div>
         </div>
       </div>

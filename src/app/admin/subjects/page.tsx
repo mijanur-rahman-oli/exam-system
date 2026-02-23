@@ -3,40 +3,29 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, Trash2, Edit, ChevronRight, BookOpen, Layers } from "lucide-react";
+import { 
+  Plus, Trash2, BookOpen, Layers, 
+  ChevronRight, FileText 
+} from "lucide-react";
+import Link from "next/link";
 
 export default function AdminSubjectsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("subjects");
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [selectedChapter, setSelectedChapter] = useState<any>(null);
-
-  // Subjects
   const [isSubjectOpen, setIsSubjectOpen] = useState(false);
+  const [isChapterOpen, setIsChapterOpen] = useState(false);
+  const [isSubconceptOpen, setIsSubconceptOpen] = useState(false);
   const [subjectName, setSubjectName] = useState("");
   const [subjectDesc, setSubjectDesc] = useState("");
-
-  // Chapters
-  const [isChapterOpen, setIsChapterOpen] = useState(false);
   const [chapterName, setChapterName] = useState("");
   const [chapterDesc, setChapterDesc] = useState("");
-
-  // Subconcepts
-  const [isSubconceptOpen, setIsSubconceptOpen] = useState(false);
   const [subconceptName, setSubconceptName] = useState("");
   const [subconceptDesc, setSubconceptDesc] = useState("");
 
   // Queries
-  const { data: subjects, refetch: refetchSubjects } = useQuery({
+  const { data: subjects, refetch: refetchSubjects, isLoading: subjectsLoading } = useQuery({
     queryKey: ["admin-subjects"],
     queryFn: async () => {
       const res = await fetch("/api/subjects");
@@ -45,7 +34,7 @@ export default function AdminSubjectsPage() {
     },
   });
 
-  const { data: chapters, refetch: refetchChapters } = useQuery({
+  const { data: chapters, refetch: refetchChapters, isLoading: chaptersLoading } = useQuery({
     queryKey: ["admin-chapters", selectedSubject?.id],
     queryFn: async () => {
       if (!selectedSubject?.id) return [];
@@ -56,7 +45,7 @@ export default function AdminSubjectsPage() {
     enabled: !!selectedSubject?.id,
   });
 
-  const { data: subconcepts, refetch: refetchSubconcepts } = useQuery({
+  const { data: subconcepts, refetch: refetchSubconcepts, isLoading: subconceptsLoading } = useQuery({
     queryKey: ["admin-subconcepts", selectedChapter?.id],
     queryFn: async () => {
       if (!selectedChapter?.id) return [];
@@ -79,7 +68,7 @@ export default function AdminSubjectsPage() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Subject created" });
+      toast({ title: "Subject created successfully" });
       setIsSubjectOpen(false);
       setSubjectName("");
       setSubjectDesc("");
@@ -114,7 +103,7 @@ export default function AdminSubjectsPage() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Chapter created" });
+      toast({ title: "Chapter created successfully" });
       setIsChapterOpen(false);
       setChapterName("");
       setChapterDesc("");
@@ -149,7 +138,7 @@ export default function AdminSubjectsPage() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Subconcept created" });
+      toast({ title: "Subconcept created successfully" });
       setIsSubconceptOpen(false);
       setSubconceptName("");
       setSubconceptDesc("");
@@ -168,240 +157,240 @@ export default function AdminSubjectsPage() {
     },
   });
 
+  const statCards = [
+    { 
+      label: "Total Subjects", 
+      value: subjects?.length ?? 0, 
+      icon: BookOpen,
+      bg: "bg-blue-500/10",
+      text: "text-blue-600 dark:text-blue-400"
+    },
+    { 
+      label: "Total Chapters", 
+      value: subjects?.reduce((acc: number, s: any) => acc + (s._count?.chapters || 0), 0) ?? 0, 
+      icon: Layers,
+      bg: "bg-green-500/10",
+      text: "text-green-600 dark:text-green-400"
+    },
+    { 
+      label: "Total Questions", 
+      value: subjects?.reduce((acc: number, s: any) => acc + (s._count?.questions || 0), 0) ?? 0, 
+      icon: FileText,
+      bg: "bg-purple-500/10",
+      text: "text-purple-600 dark:text-purple-400"
+    },
+  ];
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Academic Hierarchy</h1>
-        <p className="text-muted-foreground mt-1">Manage Subjects, Chapters, and Sub-concepts</p>
+    <div className="p-6 space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-[var(--text)]">Academic Hierarchy</h1>
+        <p className="text-[var(--text2)] mt-2">Manage Subjects, Chapters, and Sub-concepts</p>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left sidebar - Subject list */}
-        <div className="col-span-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Subjects</CardTitle>
-              <Dialog open={isSubjectOpen} onOpenChange={setIsSubjectOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="outline">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader><DialogTitle>Add Subject</DialogTitle></DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <Input
-                      placeholder="Subject name"
-                      value={subjectName}
-                      onChange={(e) => setSubjectName(e.target.value)}
-                    />
-                    <Textarea
-                      placeholder="Description (optional)"
-                      value={subjectDesc}
-                      onChange={(e) => setSubjectDesc(e.target.value)}
-                    />
-                    <Button
-                      onClick={() => createSubject.mutate()}
-                      disabled={!subjectName.trim()}
-                      className="w-full"
-                    >
-                      Create Subject
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {subjects?.map((subject: any) => (
-                  <div
-                    key={subject.id}
-                    className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 ${
-                      selectedSubject?.id === subject.id ? "bg-muted" : ""
-                    }`}
-                    onClick={() => setSelectedSubject(subject)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{subject.name}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Delete subject "${subject.name}"?`)) {
-                          deleteSubject.mutate(subject.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                ))}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={index}
+              className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:shadow-lg transition-all duration-200"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-xl ${stat.bg}`}>
+                  <Icon className={`h-5 w-5 ${stat.text}`} />
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <div className="text-2xl font-bold text-[var(--text)]">{stat.value}</div>
+                <p className="text-sm text-[var(--text2)] mt-1">{stat.label}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Three Column Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Subjects Column */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+            <h2 className="font-semibold text-[var(--text)]">Subjects</h2>
+            <button
+              onClick={() => setIsSubjectOpen(true)}
+              className="p-2 text-[var(--text2)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-lg transition-colors"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {subjectsLoading ? (
+              <div className="p-8 text-center">
+                <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto" />
+              </div>
+            ) : subjects?.length === 0 ? (
+              <div className="p-8 text-center text-[var(--text2)]">
+                No subjects yet
+              </div>
+            ) : (
+              subjects?.map((subject: any) => (
+                <div
+                  key={subject.id}
+                  onClick={() => setSelectedSubject(subject)}
+                  className={`p-4 cursor-pointer hover:bg-[var(--surface2)] transition-colors flex justify-between items-center ${
+                    selectedSubject?.id === subject.id ? 'bg-[var(--accent-bg)]' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <BookOpen size={16} className="text-[var(--accent)]" />
+                    <span className="text-[var(--text)]">{subject.name}</span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete subject "${subject.name}"?`)) {
+                        deleteSubject.mutate(subject.id);
+                      }
+                    }}
+                    className="p-1 text-[var(--text2)] hover:text-[var(--red)] hover:bg-[var(--red-bg)] rounded transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* Middle - Chapters */}
-        <div className="col-span-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">
-                {selectedSubject ? (
-                  <div className="flex items-center gap-2">
-                    <span>{selectedSubject.name}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Chapters</span>
-                  </div>
-                ) : (
-                  "Chapters"
-                )}
-              </CardTitle>
-              {selectedSubject && (
-                <Dialog open={isChapterOpen} onOpenChange={setIsChapterOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle>Add Chapter to {selectedSubject.name}</DialogTitle></DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <Input
-                        placeholder="Chapter name"
-                        value={chapterName}
-                        onChange={(e) => setChapterName(e.target.value)}
-                      />
-                      <Textarea
-                        placeholder="Description (optional)"
-                        value={chapterDesc}
-                        onChange={(e) => setChapterDesc(e.target.value)}
-                      />
-                      <Button
-                        onClick={() => createChapter.mutate()}
-                        disabled={!chapterName.trim()}
-                        className="w-full"
-                      >
-                        Create Chapter
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </CardHeader>
-            <CardContent className="p-0">
-              {!selectedSubject ? (
-                <p className="text-center text-muted-foreground py-8">Select a subject first</p>
-              ) : (
-                <div className="divide-y">
-                  {chapters?.map((chapter: any) => (
-                    <div
-                      key={chapter.id}
-                      className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 ${
-                        selectedChapter?.id === chapter.id ? "bg-muted" : ""
-                      }`}
-                      onClick={() => setSelectedChapter(chapter)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Layers className="h-4 w-4 text-muted-foreground" />
-                        <span>{chapter.name}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Delete chapter "${chapter.name}"?`)) {
-                            deleteChapter.mutate(chapter.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  ))}
+        {/* Chapters Column */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+            <h2 className="font-semibold text-[var(--text)]">
+              {selectedSubject ? (
+                <div className="flex items-center gap-2">
+                  <span>{selectedSubject.name}</span>
+                  <ChevronRight size={14} className="text-[var(--text3)]" />
+                  <span className="text-[var(--text2)]">Chapters</span>
                 </div>
+              ) : (
+                "Chapters"
               )}
-            </CardContent>
-          </Card>
+            </h2>
+            {selectedSubject && (
+              <button
+                onClick={() => setIsChapterOpen(true)}
+                className="p-2 text-[var(--text2)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-lg transition-colors"
+              >
+                <Plus size={18} />
+              </button>
+            )}
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {!selectedSubject ? (
+              <div className="p-8 text-center text-[var(--text2)]">
+                Select a subject first
+              </div>
+            ) : chaptersLoading ? (
+              <div className="p-8 text-center">
+                <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto" />
+              </div>
+            ) : chapters?.length === 0 ? (
+              <div className="p-8 text-center text-[var(--text2)]">
+                No chapters yet
+              </div>
+            ) : (
+              chapters?.map((chapter: any) => (
+                <div
+                  key={chapter.id}
+                  onClick={() => setSelectedChapter(chapter)}
+                  className={`p-4 cursor-pointer hover:bg-[var(--surface2)] transition-colors flex justify-between items-center ${
+                    selectedChapter?.id === chapter.id ? 'bg-[var(--accent-bg)]' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Layers size={16} className="text-[var(--accent)]" />
+                    <span className="text-[var(--text)]">{chapter.name}</span>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete chapter "${chapter.name}"?`)) {
+                        deleteChapter.mutate(chapter.id);
+                      }
+                    }}
+                    className="p-1 text-[var(--text2)] hover:text-[var(--red)] hover:bg-[var(--red-bg)] rounded transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* Right - Subconcepts */}
-        <div className="col-span-5">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">
-                {selectedChapter ? (
-                  <div className="flex items-center gap-2">
-                    <span>{selectedChapter.name}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Sub-concepts</span>
-                  </div>
-                ) : (
-                  "Sub-concepts"
-                )}
-              </CardTitle>
-              {selectedChapter && (
-                <Dialog open={isSubconceptOpen} onOpenChange={setIsSubconceptOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader><DialogTitle>Add Sub-concept to {selectedChapter.name}</DialogTitle></DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <Input
-                        placeholder="Sub-concept name"
-                        value={subconceptName}
-                        onChange={(e) => setSubconceptName(e.target.value)}
-                      />
-                      <Textarea
-                        placeholder="Description (optional)"
-                        value={subconceptDesc}
-                        onChange={(e) => setSubconceptDesc(e.target.value)}
-                      />
-                      <Button
-                        onClick={() => createSubconcept.mutate()}
-                        disabled={!subconceptName.trim()}
-                        className="w-full"
-                      >
-                        Create Sub-concept
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </CardHeader>
-            <CardContent className="p-0">
-              {!selectedChapter ? (
-                <p className="text-center text-muted-foreground py-8">Select a chapter first</p>
-              ) : (
-                <div className="divide-y">
-                  {subconcepts?.map((sc: any) => (
-                    <div key={sc.id} className="flex items-center justify-between p-3">
-                      <span>{sc.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm(`Delete sub-concept "${sc.name}"?`)) {
-                            deleteSubconcept.mutate(sc.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  ))}
+        {/* Subconcepts Column */}
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+            <h2 className="font-semibold text-[var(--text)]">
+              {selectedChapter ? (
+                <div className="flex items-center gap-2">
+                  <span>{selectedChapter.name}</span>
+                  <ChevronRight size={14} className="text-[var(--text3)]" />
+                  <span className="text-[var(--text2)]">Sub-concepts</span>
                 </div>
+              ) : (
+                "Sub-concepts"
               )}
-            </CardContent>
-          </Card>
+            </h2>
+            {selectedChapter && (
+              <button
+                onClick={() => setIsSubconceptOpen(true)}
+                className="p-2 text-[var(--text2)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-lg transition-colors"
+              >
+                <Plus size={18} />
+              </button>
+            )}
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {!selectedChapter ? (
+              <div className="p-8 text-center text-[var(--text2)]">
+                Select a chapter first
+              </div>
+            ) : subconceptsLoading ? (
+              <div className="p-8 text-center">
+                <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto" />
+              </div>
+            ) : subconcepts?.length === 0 ? (
+              <div className="p-8 text-center text-[var(--text2)]">
+                No sub-concepts yet
+              </div>
+            ) : (
+              subconcepts?.map((sc: any) => (
+                <div
+                  key={sc.id}
+                  className="p-4 flex justify-between items-center hover:bg-[var(--surface2)] transition-colors"
+                >
+                  <span className="text-[var(--text)]">{sc.name}</span>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete sub-concept "${sc.name}"?`)) {
+                        deleteSubconcept.mutate(sc.id);
+                      }
+                    }}
+                    className="p-1 text-[var(--text2)] hover:text-[var(--red)] hover:bg-[var(--red-bg)] rounded transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Create Modals (simplified for brevity - add your dialog components here) */}
     </div>
   );
 }

@@ -3,16 +3,12 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
-import { Search, Trash2, ShieldCheck, Plus, UserPlus } from "lucide-react";
+import { 
+  Search, Trash2, ShieldCheck, UserPlus, 
+  Users, GraduationCap, UserCog, Shield 
+} from "lucide-react";
 
 export default function AdminUsersPage() {
   const { toast } = useToast();
@@ -22,7 +18,7 @@ export default function AdminUsersPage() {
     username: "",
     email: "",
     password: "",
-    role: "student" as string,
+    role: "student",
     phone: "",
     grade: "",
     fullName: "",
@@ -36,31 +32,6 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
-  });
-
-  const createUserMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to create user");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "User created successfully" });
-      setIsCreateOpen(false);
-      setNewUser({
-        username: "", email: "", password: "", role: "student",
-        phone: "", grade: "", fullName: "", subject: "",
-      });
-      refetch();
-    },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -92,236 +63,190 @@ export default function AdminUsersPage() {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  const statCards = [
+    { 
+      label: "Total Users", 
+      value: users?.length ?? 0, 
+      icon: Users,
+      bg: "bg-blue-500/10",
+      text: "text-blue-600 dark:text-blue-400"
+    },
+    { 
+      label: "Students", 
+      value: users?.filter((u: any) => u.role === "student").length ?? 0, 
+      icon: GraduationCard,
+      bg: "bg-purple-500/10",
+      text: "text-purple-600 dark:text-purple-400"
+    },
+    { 
+      label: "Teachers", 
+      value: users?.filter((u: any) => u.role === "teacher").length ?? 0, 
+      icon: UserCog,
+      bg: "bg-green-500/10",
+      text: "text-green-600 dark:text-green-400"
+    },
+    { 
+      label: "Admins", 
+      value: users?.filter((u: any) => u.role === "admin").length ?? 0, 
+      icon: Shield,
+      bg: "bg-red-500/10",
+      text: "text-red-600 dark:text-red-400"
+    },
+  ];
+
   const roleColors: Record<string, string> = {
-    admin: "bg-red-100 text-red-800",
-    teacher: "bg-blue-100 text-blue-800",
-    question_setter: "bg-green-100 text-green-800",
-    student: "bg-purple-100 text-purple-800",
+    admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800",
+    teacher: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800",
+    question_setter: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800",
+    student: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800",
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6 space-y-8">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Manage Users</h1>
-          <p className="text-muted-foreground mt-1">Create and manage all system users</p>
+          <h1 className="text-3xl font-bold text-[var(--text)]">User Management</h1>
+          <p className="text-[var(--text2)] mt-2">Create and manage all system users</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New User</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username *</Label>
-                  <Input
-                    id="username"
-                    value={newUser.username}
-                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                    placeholder="johndoe"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    placeholder="john@example.com"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  placeholder="Enter password"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role">Role *</Label>
-                <Select
-                  value={newUser.role}
-                  onValueChange={(value) => setNewUser({ ...newUser, role: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="student">Student</SelectItem>
-                    <SelectItem value="teacher">Teacher</SelectItem>
-                    <SelectItem value="question_setter">Question Setter</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={newUser.phone}
-                  onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
-                  placeholder="+1234567890"
-                />
-              </div>
-
-              {(newUser.role === "student" || newUser.role === "teacher" || newUser.role === "question_setter") && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      value={newUser.fullName}
-                      onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
-                      placeholder="John Doe"
-                    />
-                  </div>
-
-                  {newUser.role === "student" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="grade">Grade</Label>
-                      <Input
-                        id="grade"
-                        value={newUser.grade}
-                        onChange={(e) => setNewUser({ ...newUser, grade: e.target.value })}
-                        placeholder="10th Grade"
-                      />
-                    </div>
-                  )}
-
-                  {(newUser.role === "teacher" || newUser.role === "question_setter") && (
-                    <div className="space-y-2">
-                      <Label htmlFor="subject">Subject Specialization</Label>
-                      <Input
-                        id="subject"
-                        value={newUser.subject}
-                        onChange={(e) => setNewUser({ ...newUser, subject: e.target.value })}
-                        placeholder="Mathematics"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => createUserMutation.mutate()}
-                  disabled={!newUser.username || !newUser.email || !newUser.password || createUserMutation.isPending}
-                >
-                  {createUserMutation.isPending ? "Creating..." : "Create User"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <button
+          onClick={() => setIsCreateOpen(true)}
+          className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-dim)] transition-colors flex items-center gap-2"
+        >
+          <UserPlus size={20} />
+          Add User
+        </button>
       </div>
 
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={index}
+              className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:shadow-lg transition-all duration-200"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-xl ${stat.bg}`}>
+                  <Icon className={`h-5 w-5 ${stat.text}`} />
+                </div>
+                <span className="text-xs text-[var(--text3)]">Total</span>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-[var(--text)]">{stat.value}</div>
+                <p className="text-sm text-[var(--text2)] mt-1">{stat.label}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)]" />
+        <input
+          type="text"
           placeholder="Search by username or email..."
-          className="pl-9 max-w-sm"
+          className="w-full max-w-md pl-10 pr-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--input-bg)] text-[var(--text)] placeholder:text-[var(--text3)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Users ({filtered?.length ?? 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="text-center py-8 text-muted-foreground">Loading users...</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Verified</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered?.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No users found
-                    </TableCell>
-                  </TableRow>
-                )}
+      {/* Users Table */}
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <div className="p-6 border-b border-[var(--border)]">
+          <h2 className="text-lg font-semibold text-[var(--text)]">All Users ({filtered?.length ?? 0})</h2>
+        </div>
+
+        {filtered?.length === 0 ? (
+          <div className="text-center py-16">
+            <Users className="h-12 w-12 mx-auto mb-4 text-[var(--text3)]" />
+            <p className="text-[var(--text2)]">No users found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Username</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Verified</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Joined</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
                 {filtered?.map((user: any) => (
-                  <TableRow key={user.id}>
-                    <TableCell>{user.id}</TableCell>
-                    <TableCell className="font-medium">{user.username}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${roleColors[user.role] ?? "bg-gray-100 text-gray-800"}`}>
+                  <tr key={user.id} className="hover:bg-[var(--surface2)] transition-colors">
+                    <td className="px-6 py-4 text-sm text-[var(--text2)]">{user.id}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-[var(--text)]">{user.username}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[var(--text2)]">{user.email}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${roleColors[user.role]}`}>
                         {user.role.replace("_", " ")}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${user.isVerified ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        user.isVerified 
+                          ? 'bg-[var(--green-bg)] text-[var(--green)] border border-[var(--green)]/20' 
+                          : 'bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)]/20'
+                      }`}>
                         {user.isVerified ? "Verified" : "Pending"}
                       </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[var(--text2)]">
                       {new Date(user.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
                         {!user.isVerified && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <button
                             onClick={() => verifyMutation.mutate(user.id)}
+                            className="p-2 text-[var(--green)] hover:bg-[var(--green-bg)] rounded-lg transition-colors"
                             title="Verify user"
                           >
-                            <ShieldCheck className="h-4 w-4 text-green-600" />
-                          </Button>
+                            <ShieldCheck size={16} />
+                          </button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <button
                           onClick={() => {
                             if (confirm(`Delete user "${user.username}"? This cannot be undone.`)) {
                               deleteMutation.mutate(user.id);
                             }
                           }}
+                          className="p-2 text-[var(--text2)] hover:text-[var(--red)] hover:bg-[var(--red-bg)] rounded-lg transition-colors"
                           title="Delete user"
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                          <Trash2 size={16} />
+                        </button>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+function GraduationCard(props: any) {
+  return <GraduationCap {...props} />;
 }

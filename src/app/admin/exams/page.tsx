@@ -3,14 +3,10 @@
 
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { 
   Plus, Trash2, Eye, Edit, ToggleLeft, ToggleRight,
-  Calendar, Users, Clock
+  Calendar, Users, Clock, BookOpen, FileQuestion, AlertCircle
 } from "lucide-react";
 
 export default function AdminExamsPage() {
@@ -20,7 +16,10 @@ export default function AdminExamsPage() {
     queryKey: ["admin-exams"],
     queryFn: async () => {
       const res = await fetch("/api/exams");
-      if (!res.ok) throw new Error("Failed to fetch exams");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to fetch exams");
+      }
       return res.json();
     },
   });
@@ -32,208 +31,257 @@ export default function AdminExamsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive }),
       });
-      if (!res.ok) throw new Error("Failed to update exam");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Failed to update exam");
+      }
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Exam status updated" });
+      toast({ 
+        title: "Success", 
+        description: "Exam status updated successfully" 
+      });
       refetch();
     },
-    onError: () => toast({ title: "Error", variant: "destructive" }),
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to update exam", 
+        variant: "destructive" 
+      });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/exams/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete exam");
+      const res = await fetch(`/api/exams/${id}`, { 
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      
+      // Check if response is JSON
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to delete exam");
+        }
+        return data;
+      } else {
+        // Handle non-JSON response
+        if (!res.ok) {
+          throw new Error("Failed to delete exam");
+        }
+        return { success: true };
+      }
     },
     onSuccess: () => {
-      toast({ title: "Exam deleted" });
+      toast({ 
+        title: "Success", 
+        description: "Exam deleted successfully" 
+      });
       refetch();
     },
-    onError: () => toast({ title: "Error", variant: "destructive" }),
+    onError: (error: any) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to delete exam", 
+        variant: "destructive" 
+      });
+    },
   });
 
   const getStatusColor = (isActive: boolean) => {
     return isActive 
-      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400";
+      ? "bg-[var(--green-bg)] text-[var(--green)] border border-[var(--green)]/20"
+      : "bg-[var(--surface2)] text-[var(--text2)] border border-[var(--border)]";
   };
 
+  const statCards = [
+    { 
+      title: "Total Exams", 
+      value: exams?.length ?? 0, 
+      icon: BookOpen,
+      bg: "bg-blue-500/10",
+      text: "text-blue-600 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-900/50"
+    },
+    { 
+      title: "Active Exams", 
+      value: exams?.filter((e: any) => e.isActive).length ?? 0, 
+      icon: ToggleRight,
+      bg: "bg-green-500/10",
+      text: "text-green-600 dark:text-green-400",
+      border: "border-green-200 dark:border-green-900/50"
+    },
+    { 
+      title: "Total Questions", 
+      value: exams?.reduce((acc: number, e: any) => acc + (e.examQuestions?.length || 0), 0) ?? 0, 
+      icon: FileQuestion,
+      bg: "bg-purple-500/10",
+      text: "text-purple-600 dark:text-purple-400",
+      border: "border-purple-200 dark:border-purple-900/50"
+    },
+    { 
+      title: "Avg. Duration", 
+      value: exams?.length 
+        ? Math.round(exams.reduce((acc: number, e: any) => acc + e.duration, 0) / exams.length)
+        : 0, 
+      suffix: "min",
+      icon: Clock,
+      bg: "bg-orange-500/10",
+      text: "text-orange-600 dark:text-orange-400",
+      border: "border-orange-200 dark:border-orange-900/50"
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header with Create Button */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Exam Management</h1>
-          <p className="text-muted-foreground mt-1">Create and manage all exams</p>
+          <h1 className="text-3xl font-bold text-[var(--text)]">Exam Management</h1>
+          <p className="text-[var(--text2)] mt-2">Create and manage all exams in the system</p>
         </div>
         <Link href="/admin/exams/create">
-          <Button size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
+          <button className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-dim)] transition-colors flex items-center gap-2">
+            <Plus size={20} />
             Create New Exam
-          </Button>
+          </button>
         </Link>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Exams</p>
-                <p className="text-2xl font-bold">{exams?.length ?? 0}</p>
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={index}
+              className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] hover:shadow-lg transition-all duration-200"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-xl ${stat.bg}`}>
+                  <Icon className={`h-5 w-5 ${stat.text}`} />
+                </div>
+                <span className="text-xs text-[var(--text3)]">Total</span>
               </div>
-              <div className="p-3 bg-blue-100 rounded-full dark:bg-blue-900/30">
-                <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div>
+                <div className="text-2xl font-bold text-[var(--text)]">
+                  {stat.value} {stat.suffix && <span className="text-sm text-[var(--text2)] ml-1">{stat.suffix}</span>}
+                </div>
+                <p className="text-sm text-[var(--text2)] mt-1">{stat.title}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Active Exams</p>
-                <p className="text-2xl font-bold">
-                  {exams?.filter((e: any) => e.isActive).length ?? 0}
-                </p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-full dark:bg-green-900/30">
-                <ToggleRight className="h-5 w-5 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Questions</p>
-                <p className="text-2xl font-bold">
-                  {exams?.reduce((acc: number, e: any) => acc + (e.examQuestions?.length || 0), 0) ?? 0}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-full dark:bg-purple-900/30">
-                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Avg. Duration</p>
-                <p className="text-2xl font-bold">
-                  {exams?.length 
-                    ? Math.round(exams.reduce((acc: number, e: any) => acc + e.duration, 0) / exams.length)
-                    : 0} min
-                </p>
-              </div>
-              <div className="p-3 bg-orange-100 rounded-full dark:bg-orange-900/30">
-                <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
 
       {/* Exams Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Exams</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="text-center py-8 text-muted-foreground">Loading exams...</p>
-          ) : exams?.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No exams created yet</p>
-              <Link href="/admin/exams/create">
-                <Button variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create your first exam
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Exam Name</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Questions</TableHead>
-                  <TableHead>Total Marks</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <div className="p-6 border-b border-[var(--border)]">
+          <h2 className="text-lg font-semibold text-[var(--text)]">All Exams</h2>
+        </div>
+        
+        {exams?.length === 0 ? (
+          <div className="text-center py-16">
+            <BookOpen className="h-12 w-12 mx-auto mb-4 text-[var(--text3)]" />
+            <p className="text-[var(--text2)] mb-4">No exams created yet</p>
+            <Link href="/admin/exams/create">
+              <button className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-dim)] transition-colors inline-flex items-center gap-2">
+                <Plus size={16} />
+                Create your first exam
+              </button>
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[var(--surface2)] border-b border-[var(--border)]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Exam Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Subject</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Duration</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Questions</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Total Marks</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text2)] uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
                 {exams?.map((exam: any) => (
-                  <TableRow key={exam.id}>
-                    <TableCell>{exam.id}</TableCell>
-                    <TableCell className="font-medium">{exam.examName}</TableCell>
-                    <TableCell>{exam.subject?.name}</TableCell>
-                    <TableCell>{exam.duration} min</TableCell>
-                    <TableCell>{exam.examQuestions?.length ?? 0}</TableCell>
-                    <TableCell>{exam.totalMarks ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(exam.isActive)}>
+                  <tr key={exam.id} className="hover:bg-[var(--surface2)] transition-colors">
+                    <td className="px-6 py-4 text-sm text-[var(--text2)]">{exam.id}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-[var(--text)]">{exam.examName}</div>
+                      {exam.description && (
+                        <div className="text-xs text-[var(--text3)] mt-1 line-clamp-1">{exam.description}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[var(--text2)]">{exam.subject?.name || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text2)]">{exam.duration} min</td>
+                    <td className="px-6 py-4 text-sm text-[var(--text2)]">{exam.examQuestions?.length ?? 0}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-[var(--text)]">{exam.totalMarks ?? '—'}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(exam.isActive)}`}>
                         {exam.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <Link href={`/admin/exams/${exam.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                          <button className="p-2 text-[var(--text2)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-lg transition-colors">
+                            <Eye size={16} />
+                          </button>
                         </Link>
                         <Link href={`/admin/exams/${exam.id}/edit`}>
-                          <Button variant="ghost" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <button className="p-2 text-[var(--text2)] hover:text-[var(--accent)] hover:bg-[var(--accent-bg)] rounded-lg transition-colors">
+                            <Edit size={16} />
+                          </button>
                         </Link>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleMutation.mutate({ 
-                            id: exam.id, 
-                            isActive: !exam.isActive 
-                          })}
+                        <button
+                          onClick={() => toggleMutation.mutate({ id: exam.id, isActive: !exam.isActive })}
+                          className={`p-2 rounded-lg transition-colors ${
+                            exam.isActive 
+                              ? 'text-[var(--green)] hover:bg-[var(--green-bg)]' 
+                              : 'text-[var(--text2)] hover:bg-[var(--surface2)]'
+                          }`}
+                          title={exam.isActive ? "Deactivate" : "Activate"}
                         >
-                          {exam.isActive 
-                            ? <ToggleRight className="h-4 w-4 text-green-600" />
-                            : <ToggleLeft className="h-4 w-4 text-gray-400" />
-                          }
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                          {exam.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                        </button>
+                        <button
                           onClick={() => {
-                            if (confirm(`Delete exam "${exam.examName}"?`)) {
+                            if (window.confirm(`Are you sure you want to delete "${exam.examName}"? This action cannot be undone.`)) {
                               deleteMutation.mutate(exam.id);
                             }
                           }}
+                          className="p-2 text-[var(--text2)] hover:text-[var(--red)] hover:bg-[var(--red-bg)] rounded-lg transition-colors"
+                          disabled={deleteMutation.isPending}
                         >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                          <Trash2 size={16} />
+                        </button>
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
