@@ -9,34 +9,48 @@ import { existsSync } from "fs";
 async function saveFile(file: File, dir: string): Promise<string> {
   const uploadDir = join(process.cwd(), "public", "uploads", dir);
   if (!existsSync(uploadDir)) await mkdir(uploadDir, { recursive: true });
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const filename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  const bytes    = await file.arrayBuffer();
+  const buffer   = Buffer.from(bytes);
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const filename  = `${Date.now()}_${safeName}`;
   await writeFile(join(uploadDir, filename), buffer);
   return `/uploads/${dir}/${filename}`;
 }
 
+function toInt(v: string | null | undefined): number | null {
+  if (!v || v.trim() === "") return null;
+  const n = parseInt(v, 10);
+  return isNaN(n) ? null : n;
+}
+
+// ─── GET /api/questions ───────────────────────────────────────────────────────
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
-    const limit = searchParams.get("limit");
-    const subjectId = searchParams.get("subjectId");
-    const chapterId = searchParams.get("chapterId");
-    const difficulty = searchParams.get("difficulty");
+    const subjectId    = searchParams.get("subjectId");
+    const chapterId    = searchParams.get("chapterId");
+    const subconceptId = searchParams.get("subconceptId");
+    const gradeLevel   = searchParams.get("gradeLevel");
+    const difficulty   = searchParams.get("difficulty");
+    const limit        = searchParams.get("limit");
+    const createdByMe  = searchParams.get("createdByMe");
 
-    const where: any = {};
-    if (subjectId) where.subjectId = parseInt(subjectId);
-    if (chapterId) where.chapterId = parseInt(chapterId);
-    if (difficulty) where.difficulty = difficulty;
+    const where: Record<string, any> = {};
+    if (subjectId)            where.subjectId    = parseInt(subjectId);
+    if (chapterId)            where.chapterId    = parseInt(chapterId);
+    if (subconceptId)         where.subconceptId = parseInt(subconceptId);
+    if (gradeLevel)           where.gradeLevel   = gradeLevel;
+    if (difficulty)           where.difficulty   = difficulty;
+    if (createdByMe === "true") where.createdBy  = parseInt(session.user.id);
 
     const questions = await prisma.question.findMany({
       where,
       include: {
-        subject: { select: { name: true } },
-        chapter: { select: { name: true } },
+        subject:    { select: { name: true } },
+        chapter:    { select: { name: true } },
         subconcept: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -44,152 +58,141 @@ export async function GET(req: Request) {
     });
 
     return NextResponse.json(questions);
-  } catch (error) {
-    console.error("GET /api/questions error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (err) {
+    console.error("[GET /api/questions]", err);
+    return NextResponse.json({ error: "Internal server error", detail: String(err) }, { status: 500 });
   }
 }
 
+// ─── POST /api/questions ──────────────────────────────────────────────────────
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     if (!["question_setter", "admin", "teacher"].includes(session.user.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const createdBy = parseInt(session.user.id);
+
+    // ── Parse multipart or JSON ───────────────────────────────────────────
     const contentType = req.headers.get("content-type") ?? "";
+    const fields: Record<string, string> = {};
+    const files:  Record<string, File>   = {};
 
-    // ── Handle multipart/form-data (with images) ──────────────────────────
     if (contentType.includes("multipart/form-data")) {
-      const formData = await req.formData();
-
-      const subjectId = formData.get("subjectId") as string;
-      const chapterId = formData.get("chapterId") as string;
-      const subconceptId = formData.get("subconceptId") as string | null;
-      const gradeLevel = formData.get("gradeLevel") as string | null;
-      const questionText = formData.get("question") as string;
-      const difficulty = (formData.get("difficulty") as string) || "medium";
-      const marks = parseInt((formData.get("marks") as string) || "1");
-      const isMultipleAnswer = formData.get("isMultipleAnswer") === "true";
-      const optionsRaw = formData.get("options") as string;
-
-      if (!subjectId || !chapterId || !questionText) {
-        return NextResponse.json(
-          { error: "subjectId, chapterId, and question are required" },
-          { status: 400 }
-        );
+      const fd = await req.formData();
+      for (const [key, val] of fd.entries()) {
+        if (val instanceof File && val.size > 0) files[key] = val;
+        else if (typeof val === "string")        fields[key] = val;
       }
+    } else {
+      const body = await req.json();
+      Object.assign(fields, body);
+    }
 
-      // Save question image
-      let questionImageUrl: string | null = null;
-      const questionImage = formData.get("questionImage") as File | null;
-      if (questionImage && questionImage.size > 0) {
-        questionImageUrl = await saveFile(questionImage, "question-images");
-      }
+    // ── Required field checks ─────────────────────────────────────────────
+    const subjectIdRaw = fields["subjectId"];
+    const questionText = fields["question"]?.trim();
+    const optionsRaw   = fields["options"];
 
-      // Save solution PDF
-      let solutionPdfUrl: string | null = null;
-      const solutionPdf = formData.get("solutionPdf") as File | null;
-      if (solutionPdf && solutionPdf.size > 0) {
-        solutionPdfUrl = await saveFile(solutionPdf, "solution-pdfs");
-      }
+    if (!subjectIdRaw?.trim()) {
+      return NextResponse.json({ error: "subjectId is required" }, { status: 400 });
+    }
+    if (!questionText) {
+      return NextResponse.json({ error: "Question text is required" }, { status: 400 });
+    }
 
-      // Parse options JSON
-      let options: { text: string; isCorrect: boolean }[] = [];
+    // ── Parse options array ───────────────────────────────────────────────
+    let options: { text: string; isCorrect: boolean }[] = [];
+    if (optionsRaw) {
       try {
-        options = JSON.parse(optionsRaw || "[]");
+        options = JSON.parse(optionsRaw);
       } catch {
-        return NextResponse.json({ error: "Invalid options format" }, { status: 400 });
+        return NextResponse.json({ error: "Options JSON is malformed" }, { status: 400 });
       }
-
-      // Save option images
-      const optionImageUrls: (string | null)[] = options.map(() => null);
-      for (let i = 0; i < options.length; i++) {
-        const optImg = formData.get(`optionImage_${i}`) as File | null;
-        if (optImg && optImg.size > 0) {
-          optionImageUrls[i] = await saveFile(optImg, "option-images");
-        }
+    } else {
+      // Legacy: individual optionA/B/C/D + correctAnswer fields
+      const optA = fields["optionA"];
+      const optB = fields["optionB"];
+      if (!optA || !optB) {
+        return NextResponse.json({ error: "At least 2 options are required" }, { status: 400 });
       }
-
-      // Build correct answer string (for single-answer questions, store the letter A/B/C/D)
-      const correctIndexes = options
-        .map((o, i) => (o.isCorrect ? String.fromCharCode(65 + i) : null))
-        .filter(Boolean);
-      const correctAnswer = correctIndexes.join(",");
-
-      // For Prisma schema compatibility, we store options as A/B/C/D fields
-      const newQuestion = await prisma.question.create({
-        data: {
-          subjectId: parseInt(subjectId),
-          chapterId: parseInt(chapterId),
-          subconceptId: subconceptId ? parseInt(subconceptId) : null,
-          question: questionText,
-          optionA: options[0]?.text ?? "",
-          optionB: options[1]?.text ?? "",
-          optionC: options[2]?.text ?? null,
-          optionD: options[3]?.text ?? null,
-          optionAImage: optionImageUrls[0],
-          optionBImage: optionImageUrls[1],
-          optionCImage: optionImageUrls[2] ?? null,
-          optionDImage: optionImageUrls[3] ?? null,
-          correctAnswer,
-          questionImage: questionImageUrl,
-          solutionPdf: solutionPdfUrl,
-          difficulty,
-          marks,
-          isMultipleAnswer,
-          gradeLevel: gradeLevel ?? null,
-          createdBy: parseInt(session.user.id),
-        },
-      });
-
-      return NextResponse.json(newQuestion, { status: 201 });
+      const correct = (fields["correctAnswer"] ?? "A").split(",").map((s) => s.trim().toUpperCase());
+      const raw = [optA, fields["optionB"], fields["optionC"], fields["optionD"]].filter(Boolean) as string[];
+      options = raw.map((text, i) => ({
+        text,
+        isCorrect: correct.includes(String.fromCharCode(65 + i)),
+      }));
     }
 
-    // ── Handle JSON (simple, no images) ──────────────────────────────────
-    const body = await req.json();
-    const {
-      subjectId,
-      chapterId,
-      subconceptId,
-      question,
-      optionA,
-      optionB,
-      optionC,
-      optionD,
+    if (options.length < 2) {
+      return NextResponse.json({ error: "At least 2 options are required" }, { status: 400 });
+    }
+    if (!options.some((o) => o.isCorrect)) {
+      return NextResponse.json({ error: "Mark at least one correct answer" }, { status: 400 });
+    }
+
+    // correctAnswer string: "A" | "B,C" etc.
+    const correctAnswer = options
+      .map((o, i) => (o.isCorrect ? String.fromCharCode(65 + i) : null))
+      .filter(Boolean)
+      .join(",");
+
+    // ── Save images ───────────────────────────────────────────────────────
+    let questionImageUrl: string | null = null;
+    if (files["questionImage"]) {
+      questionImageUrl = await saveFile(files["questionImage"], "question-images");
+    }
+
+    const optionImageUrls: (string | null)[] = [null, null, null, null];
+    for (let i = 0; i < 4; i++) {
+      if (files[`optionImage_${i}`]) {
+        optionImageUrls[i] = await saveFile(files[`optionImage_${i}`], "option-images");
+      }
+    }
+
+    // ── Build data object matching YOUR actual schema ─────────────────────
+    const data: Record<string, any> = {
+      subjectId:       parseInt(subjectIdRaw),
+      chapterId:       toInt(fields["chapterId"]),
+      subconceptId:    toInt(fields["subconceptId"]),
+      gradeLevel:      fields["gradeLevel"]?.trim() || null,
+      question:        questionText,
+      optionA:         options[0]?.text ?? "",
+      optionB:         options[1]?.text ?? "",
+      optionC:         options[2]?.text ?? null,
+      optionD:         options[3]?.text ?? null,
       correctAnswer,
-      explanation,
-      marks,
-      difficulty,
-    } = body;
+      isMultipleAnswer: fields["isMultipleAnswer"] === "true",
+      explanation:     fields["explanation"]?.trim() || null,
+      marks:           parseInt(fields["marks"] || "1") || 1,
+      difficulty:      (fields["difficulty"] || "medium") as "easy" | "medium" | "hard",
+      createdBy,
+    };
 
-    if (!subjectId || !question || !optionA || !optionB || !correctAnswer) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    // Add image fields only if they exist in schema
+    // (safe — if column doesn't exist Prisma will throw P2009 with a clear message)
+    if (questionImageUrl) data.questionImage = questionImageUrl;
+    if (optionImageUrls[0]) data.optionAImage = optionImageUrls[0];
+    if (optionImageUrls[1]) data.optionBImage = optionImageUrls[1];
+    if (optionImageUrls[2]) data.optionCImage = optionImageUrls[2];
+    if (optionImageUrls[3]) data.optionDImage = optionImageUrls[3];
+
+    const newQuestion = await prisma.question.create({ data });
+    return NextResponse.json(newQuestion, { status: 201 });
+
+  } catch (err: any) {
+    console.error("[POST /api/questions]", err);
+
+    let message = "Internal server error";
+    if (err?.code === "P2002") message = "Duplicate entry";
+    if (err?.code === "P2003") message = "Invalid foreign key — check subject/chapter IDs exist in the database";
+    if (err?.code === "P2025") message = "Referenced record not found";
+    if (err?.code === "P2009" || err?.message?.includes("Unknown argument")) {
+      message = "Schema mismatch — run `npx prisma generate` and restart the server";
     }
 
-    const newQuestion = await prisma.question.create({
-      data: {
-        subjectId: parseInt(subjectId),
-        chapterId: chapterId ? parseInt(chapterId) : null,
-        subconceptId: subconceptId ? parseInt(subconceptId) : null,
-        question,
-        optionA,
-        optionB,
-        optionC: optionC || null,
-        optionD: optionD || null,
-        correctAnswer,
-        explanation: explanation || null,
-        marks: marks ? parseInt(marks) : 1,
-        difficulty: difficulty || "medium",
-        createdBy: parseInt(session.user.id),
-      },
-    });
-
-    return NextResponse.json(newQuestion, { status: 201 });
-  } catch (error) {
-    console.error("POST /api/questions error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: message, code: err?.code, detail: err?.message }, { status: 500 });
   }
 }
