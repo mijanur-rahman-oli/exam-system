@@ -180,7 +180,6 @@ export default function RegisterPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="teacher">Teacher</SelectItem>
                         <SelectItem value="question_setter">Question Setter</SelectItem>
                       </SelectContent>
                     </Select>

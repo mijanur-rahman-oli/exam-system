@@ -10,51 +10,57 @@ import { useToast } from "@/components/ui/use-toast";
 import {
   ArrowLeft, Plus, Trash2, ImageIcon,
   FunctionSquare, X, CheckCircle2, Upload,
-  Eye, EyeOff, AlignLeft, FileText,
+  Eye, EyeOff, AlignLeft,
 } from "lucide-react";
 import Link from "next/link";
 
-// ─── Shared select style ──────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const selBase: React.CSSProperties = {
   width: "100%", height: "2.1rem", padding: "0 0.7rem",
-  borderRadius: "0.5rem",
-  background: "var(--input-bg)",
-  border: "1.5px solid var(--border)",
-  color: "var(--text)", fontSize: "0.8rem",
-  outline: "none", appearance: "none",
+  borderRadius: "0.5rem", background: "var(--input-bg)",
+  border: "1.5px solid var(--border)", color: "var(--text)",
+  fontSize: "0.8rem", outline: "none", appearance: "none" as any,
   boxSizing: "border-box", transition: "border-color 0.15s",
 };
-
-const inpBase: React.CSSProperties = {
-  ...selBase, appearance: undefined,
-};
+const inpBase: React.CSSProperties = { ...selBase, appearance: undefined };
 
 // ─── LaTeX snippets ───────────────────────────────────────────────────────────
 const SNIPPETS = [
-  { label: "a/b", val: "\\frac{a}{b}" }, { label: "√x",  val: "\\sqrt{x}"       },
-  { label: "xⁿ",  val: "x^{n}"        }, { label: "xₙ",  val: "x_{n}"           },
-  { label: "Σ",   val: "\\sum_{i=1}^{n}" }, { label: "∫", val: "\\int_{a}^{b}"  },
-  { label: "lim", val: "\\lim_{x \\to \\infty}" }, { label: "α", val: "\\alpha" },
-  { label: "β",   val: "\\beta"        }, { label: "π",   val: "\\pi"            },
-  { label: "∞",   val: "\\infty"       }, { label: "±",   val: "\\pm"            },
-  { label: "≤",   val: "\\leq"         }, { label: "≥",   val: "\\geq"           },
+  { label: "a/b",  val: "\\frac{a}{b}"           },
+  { label: "√x",   val: "\\sqrt{x}"               },
+  { label: "xⁿ",   val: "x^{n}"                   },
+  { label: "xₙ",   val: "x_{n}"                   },
+  { label: "Σ",    val: "\\sum_{i=1}^{n}"          },
+  { label: "∫",    val: "\\int_{a}^{b}"            },
+  { label: "lim",  val: "\\lim_{x \\to \\infty}"  },
+  { label: "α",    val: "\\alpha"                  },
+  { label: "β",    val: "\\beta"                   },
+  { label: "π",    val: "\\pi"                     },
+  { label: "∞",    val: "\\infty"                  },
+  { label: "±",    val: "\\pm"                     },
+  { label: "≤",    val: "\\leq"                    },
+  { label: "≥",    val: "\\geq"                    },
 ];
 
 // ─── Image dropzone ───────────────────────────────────────────────────────────
 function ImgDrop({
   value, onChange, label = "Add image", compact = false,
 }: {
-  value: File | null; onChange: (f: File | null) => void;
-  label?: string; compact?: boolean;
+  value: File | null;
+  onChange: (f: File | null) => void;
+  label?: string;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
+
   const handle = (file: File) => {
     onChange(file);
     const r = new FileReader();
     r.onload = (e) => setPreview(e.target?.result as string);
     r.readAsDataURL(file);
   };
+
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
@@ -63,7 +69,8 @@ function ImgDrop({
 
   return (
     <div
-      onDrop={onDrop} onDragOver={(e) => e.preventDefault()}
+      onDrop={onDrop}
+      onDragOver={(e) => e.preventDefault()}
       onClick={() => ref.current?.click()}
       style={{
         cursor: "pointer", borderRadius: "0.5rem",
@@ -75,15 +82,20 @@ function ImgDrop({
     >
       {preview ? (
         <div style={{ position: "relative", padding: "0.5rem" }}>
-          <img src={preview} alt="preview" style={{ maxHeight: "9rem", margin: "0 auto", display: "block", borderRadius: "0.375rem", objectFit: "contain" }} />
-          <button type="button"
+          <img
+            src={preview} alt="preview"
+            style={{ maxHeight: "9rem", margin: "0 auto", display: "block", borderRadius: "0.375rem", objectFit: "contain" }}
+          />
+          <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); onChange(null); setPreview(null); }}
             style={{
               position: "absolute", top: "0.25rem", right: "0.25rem",
               background: "var(--red)", color: "#fff", border: "none",
               borderRadius: "50%", width: "1.25rem", height: "1.25rem",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
+            }}
+          >
             <X size={10} />
           </button>
         </div>
@@ -97,18 +109,23 @@ function ImgDrop({
           {!compact && <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>drag & drop or click</span>}
         </div>
       )}
-      <input ref={ref} type="file" accept="image/*" style={{ display: "none" }}
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handle(f); }} />
+      <input
+        ref={ref} type="file" accept="image/*" style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handle(f); }}
+      />
     </div>
   );
 }
 
-// ─── Rich text / LaTeX input ──────────────────────────────────────────────────
+// ─── Rich text / LaTeX field ──────────────────────────────────────────────────
 function RichField({
   value, onChange, placeholder, multiline = false, label,
 }: {
-  value: string; onChange: (v: string) => void;
-  placeholder?: string; multiline?: boolean; label?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+  label?: string;
 }) {
   const [mode, setMode] = useState<"text" | "latex">("text");
   const [preview, setPreview] = useState(false);
@@ -116,11 +133,9 @@ function RichField({
 
   const base: React.CSSProperties = {
     background: "var(--input-bg)", border: "1.5px solid var(--border)",
-    color: "var(--text)", fontFamily: "monospace",
-    fontSize: "0.85rem", borderRadius: "0.5rem",
-    width: "100%", padding: "0.5rem 0.75rem",
-    outline: "none", boxSizing: "border-box",
-    transition: "border-color 0.15s",
+    color: "var(--text)", fontFamily: "monospace", fontSize: "0.85rem",
+    borderRadius: "0.5rem", width: "100%", padding: "0.5rem 0.75rem",
+    outline: "none", boxSizing: "border-box", transition: "border-color 0.15s",
   };
 
   return (
@@ -128,8 +143,6 @@ function RichField({
       {label && (
         <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text2)" }}>{label}</span>
       )}
-
-      {/* Mode toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
         <div style={{
           display: "flex", borderRadius: "0.375rem", overflow: "hidden",
@@ -142,7 +155,6 @@ function RichField({
               color: mode === m ? "#fff" : "var(--text2)",
               border: "none", cursor: "pointer",
               display: "flex", alignItems: "center", gap: "0.25rem",
-              transition: "all 0.12s",
             }}>
               {m === "text" ? <AlignLeft size={10} /> : <FunctionSquare size={10} />}
               {m === "text" ? "Text" : "LaTeX"}
@@ -152,31 +164,30 @@ function RichField({
         {mode === "latex" && value && (
           <button type="button" onClick={() => setPreview((v) => !v)} style={{
             fontSize: "0.68rem", color: "var(--text2)", background: "none",
-            border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", gap: "0.2rem",
+            border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.2rem",
           }}>
             {preview ? <EyeOff size={10} /> : <Eye size={10} />}
             {preview ? "Hide" : "Preview"}
           </button>
         )}
       </div>
-
-      {/* Input */}
       {multiline ? (
-        <textarea value={value} onChange={(e) => onChange(e.target.value)}
+        <textarea
+          value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={mode === "latex" ? "e.g. Solve $\\frac{d}{dx}[x^n]$" : placeholder}
           rows={4} style={{ ...base, resize: "vertical", lineHeight: 1.6 }}
           onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")} />
+          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+        />
       ) : (
-        <input value={value} onChange={(e) => onChange(e.target.value)}
+        <input
+          value={value} onChange={(e) => onChange(e.target.value)}
           placeholder={mode === "latex" ? "e.g. $E = mc^2$" : placeholder}
           style={{ ...base, height: "2.1rem" }}
           onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--border)")} />
+          onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+        />
       )}
-
-      {/* Preview */}
       {mode === "latex" && preview && value && (
         <div style={{
           padding: "0.5rem 0.75rem", borderRadius: "0.5rem",
@@ -187,8 +198,6 @@ function RichField({
           {value}
         </div>
       )}
-
-      {/* Snippet buttons */}
       {mode === "latex" && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
           {SNIPPETS.map((s) => (
@@ -204,7 +213,7 @@ function RichField({
   );
 }
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
+// ─── Card wrapper ─────────────────────────────────────────────────────────────
 function Card({ children, title }: { children: React.ReactNode; title?: string }) {
   return (
     <div style={{
@@ -224,29 +233,172 @@ function Card({ children, title }: { children: React.ReactNode; title?: string }
   );
 }
 
-// ─── Sidebar label ────────────────────────────────────────────────────────────
 function FieldLabel({ children, optional }: { children: React.ReactNode; optional?: boolean }) {
   return (
     <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--text2)" }}>
       {children}
       {optional && (
-        <span style={{ fontWeight: 400, color: "var(--text3)", marginLeft: "0.3rem" }}>
-          (optional)
-        </span>
+        <span style={{ fontWeight: 400, color: "var(--text3)", marginLeft: "0.3rem" }}>(optional)</span>
       )}
     </span>
   );
 }
 
-// ─── Schema — chapter & subconcept now optional ───────────────────────────────
+// ─── ✅ FIX: Option image state lives HERE, outside the map ───────────────────
+// Each option row gets its own "show image" boolean tracked in an array at the
+// page level — not inside the map. Calling useState inside map() violates the
+// Rules of Hooks and silently breaks React.
+function OptionRow({
+  index,
+  fieldId,
+  control,
+  errors,
+  isMultiple,
+  fields,
+  setValue,
+  optionImages,
+  setOptionImages,
+  onRemove,
+  canRemove,
+}: {
+  index: number;
+  fieldId: string;
+  control: any;
+  errors: any;
+  isMultiple: boolean;
+  fields: any[];
+  setValue: any;
+  optionImages: (File | null)[];
+  setOptionImages: React.Dispatch<React.SetStateAction<(File | null)[]>>;
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  // ✅ useState is now called at the top level of a component, not inside a loop
+  const [showImg, setShowImg] = useState(false);
+  const letter = String.fromCharCode(65 + index);
+
+  return (
+    <div
+      key={fieldId}
+      style={{
+        border: "1px solid var(--border)", borderRadius: "0.625rem",
+        overflow: "hidden", transition: "border-color 0.15s",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--border2)")}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", padding: "0.75rem" }}>
+        {/* Correct answer badge */}
+        <Controller
+          name={`options.${index}.isCorrect`}
+          control={control}
+          render={({ field: f }) => (
+            <button
+              type="button"
+              onClick={() => {
+                if (!isMultiple) {
+                  fields.forEach((_, i) => {
+                    if (i !== index) setValue(`options.${i}.isCorrect`, false);
+                  });
+                }
+                f.onChange(!f.value);
+              }}
+              title={f.value ? "Correct answer" : "Mark as correct"}
+              style={{
+                flexShrink: 0, marginTop: "0.2rem",
+                width: "1.55rem", height: "1.55rem", borderRadius: "50%",
+                border: `2px solid ${f.value ? "var(--green)" : "var(--border2)"}`,
+                background: f.value ? "var(--green-bg)" : "transparent",
+                color: f.value ? "var(--green)" : "var(--text3)",
+                cursor: "pointer", display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: "0.7rem", fontWeight: 700,
+                transition: "all 0.12s",
+              }}
+            >
+              {f.value ? <CheckCircle2 size={13} /> : letter}
+            </button>
+          )}
+        />
+
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <Controller
+            name={`options.${index}.text`}
+            control={control}
+            render={({ field: f }) => (
+              <RichField
+                value={f.value ?? ""}
+                onChange={f.onChange}
+                placeholder={`Option ${letter}`}
+              />
+            )}
+          />
+          {errors.options?.[index]?.text && (
+            <span style={{ fontSize: "0.7rem", color: "var(--red)" }}>
+              {errors.options[index]?.text?.message}
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowImg((v) => !v)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: "0.68rem", color: "var(--text3)",
+              display: "flex", alignItems: "center", gap: "0.25rem",
+              padding: 0, alignSelf: "flex-start", transition: "color 0.12s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text2)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text3)")}
+          >
+            <ImageIcon size={10} />
+            {showImg ? "Remove image" : "Add image to this option"}
+          </button>
+
+          {showImg && (
+            <ImgDrop
+              compact
+              value={optionImages[index] ?? null}
+              onChange={(f) => {
+                setOptionImages((prev) => {
+                  const next = [...prev];
+                  next[index] = f;
+                  return next;
+                });
+              }}
+              label={`Image for option ${letter}`}
+            />
+          )}
+        </div>
+
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            style={{
+              flexShrink: 0, background: "none", border: "none",
+              cursor: "pointer", color: "var(--text3)",
+              padding: "0.2rem", borderRadius: "0.25rem", transition: "color 0.12s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--red)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text3)")}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Schema ───────────────────────────────────────────────────────────────────
 const schema = z.object({
-  subjectId:       z.string().min(1, "Subject is required"),
-  chapterId:       z.string().optional(),   // ← no longer required
-  subconceptId:    z.string().optional(),
-  gradeLevel:      z.string().optional(),
-  question:        z.string().min(5, "Question must be at least 5 characters"),
-  difficulty:      z.enum(["easy", "medium", "hard"]).default("medium"),
-  marks:           z.coerce.number().min(1).max(100).default(1),
+  subjectId:        z.string().min(1, "Subject is required"),
+  chapterId:        z.string().optional(),
+  subconceptId:     z.string().optional(),
+  gradeLevel:       z.string().optional(),
+  question:         z.string().min(5, "Question must be at least 5 characters"),
+  difficulty:       z.enum(["easy", "medium", "hard"]).default("medium"),
+  marks:            z.coerce.number().min(1).max(100).default(1),
   isMultipleAnswer: z.boolean().default(false),
   options: z.array(z.object({
     text:      z.string().min(1, "Option text is required"),
@@ -259,20 +411,25 @@ type FormData = z.infer<typeof schema>;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CreateQuestionPage() {
-  const router = useRouter();
+  const router    = useRouter();
   const { toast } = useToast();
+
   const [loading,       setLoading]       = useState(false);
   const [selSubject,    setSelSubject]     = useState("");
   const [selChapter,    setSelChapter]     = useState("");
   const [questionImage, setQuestionImage]  = useState<File | null>(null);
   const [solutionImage, setSolutionImage]  = useState<File | null>(null);
+  // ✅ All option image state lives here — one array, indexed by option position
   const [optionImages,  setOptionImages]   = useState<(File | null)[]>([null, null, null, null]);
 
-  const { data: subjects }    = useQuery({ queryKey: ["subjects"],               queryFn: () => fetch("/api/subjects").then(r => r.json()) });
-  const { data: chapters }    = useQuery({ queryKey: ["chapters", selSubject],    queryFn: () => fetch(`/api/chapters?subjectId=${selSubject}`).then(r => r.json()), enabled: !!selSubject });
-  const { data: subconcepts } = useQuery({ queryKey: ["subconcepts", selChapter], queryFn: () => fetch(`/api/subconcepts?chapterId=${selChapter}`).then(r => r.json()), enabled: !!selChapter });
+  const { data: subjects }    = useQuery({ queryKey: ["subjects"],               queryFn: () => fetch("/api/subjects").then((r) => r.json()) });
+  const { data: chapters }    = useQuery({ queryKey: ["chapters", selSubject],    queryFn: () => fetch(`/api/chapters?subjectId=${selSubject}`).then((r) => r.json()), enabled: !!selSubject });
+  const { data: subconcepts } = useQuery({ queryKey: ["subconcepts", selChapter], queryFn: () => fetch(`/api/subconcepts?chapterId=${selChapter}`).then((r) => r.json()), enabled: !!selChapter });
 
-  const { handleSubmit, control, watch, setValue, formState: { errors } } = useForm<FormData>({
+  const {
+    handleSubmit, control, watch, setValue,
+    formState: { errors },
+  } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       marks: 1, difficulty: "medium",
@@ -290,6 +447,7 @@ export default function CreateQuestionPage() {
   const isMultiple   = watch("isMultipleAnswer");
   const solutionType = watch("solutionType");
 
+  // ─── Submit ────────────────────────────────────────────────────────────────
   const onSubmit = async (data: FormData) => {
     const hasCorrect = data.options.some((o) => o.isCorrect);
     if (!hasCorrect) {
@@ -308,7 +466,9 @@ export default function CreateQuestionPage() {
       fd.append("marks",            String(data.marks));
       fd.append("isMultipleAnswer", String(data.isMultipleAnswer));
       fd.append("solutionType",     data.solutionType);
-      fd.append("options",          JSON.stringify(data.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }))));
+      fd.append("options", JSON.stringify(
+        data.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }))
+      ));
       if (data.solutionType === "text" && data.solutionText) {
         fd.append("solutionText", data.solutionText);
       }
@@ -317,8 +477,10 @@ export default function CreateQuestionPage() {
       optionImages.forEach((img, i) => { if (img) fd.append(`optionImage_${i}`, img); });
 
       const res = await fetch("/api/questions", { method: "POST", body: fd });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Failed to save"); }
-
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.error || "Failed to save");
+      }
       toast({ title: "Question saved!", description: "Added to the question bank." });
       router.push("/question-setter/questions");
     } catch (err: any) {
@@ -329,22 +491,20 @@ export default function CreateQuestionPage() {
   };
 
   const diffStyle = {
-    easy:   { border: "var(--green)",  bg: "var(--green-bg)",  text: "var(--green)"  },
-    medium: { border: "var(--amber)",  bg: "var(--amber-bg)",  text: "var(--amber)"  },
-    hard:   { border: "var(--red)",    bg: "var(--red-bg)",    text: "var(--red)"    },
+    easy:   { border: "var(--green)", bg: "var(--green-bg)", text: "var(--green)" },
+    medium: { border: "var(--amber)", bg: "var(--amber-bg)", text: "var(--amber)" },
+    hard:   { border: "var(--red)",   bg: "var(--red-bg)",   text: "var(--red)"   },
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-
-      {/* ── Page header ── */}
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <Link href="/question-setter/questions">
             <button style={{
               background: "none", border: "none", cursor: "pointer",
-              color: "var(--text2)", display: "flex", padding: "0.25rem",
-              borderRadius: "0.375rem",
+              color: "var(--text2)", display: "flex", padding: "0.25rem", borderRadius: "0.375rem",
             }}>
               <ArrowLeft size={18} />
             </button>
@@ -374,7 +534,7 @@ export default function CreateQuestionPage() {
               padding: "0.45rem 1.1rem", borderRadius: "0.5rem", fontSize: "0.8rem",
               background: loading ? "var(--accent-dim)" : "var(--accent)",
               border: "none", color: "#fff", fontWeight: 700,
-              cursor: loading ? "not-allowed" : "pointer", transition: "all 0.15s",
+              cursor: loading ? "not-allowed" : "pointer",
             }}
           >
             {loading ? "Saving…" : "Save Question"}
@@ -382,9 +542,7 @@ export default function CreateQuestionPage() {
         </div>
       </div>
 
-      {/* ── Two-column layout ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 272px", gap: "1.1rem" }}>
-
         {/* ════ LEFT ════ */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
@@ -410,12 +568,12 @@ export default function CreateQuestionPage() {
             </div>
           </Card>
 
-          {/* Options */}
+          {/* Answer options */}
           <Card title="Answer Options">
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
 
               {/* MSQ toggle */}
-              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "0.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <Controller name="isMultipleAnswer" control={control} render={({ field }) => (
                   <label style={{
                     display: "flex", alignItems: "center", gap: "0.45rem",
@@ -446,106 +604,33 @@ export default function CreateQuestionPage() {
                 <span style={{ fontSize: "0.72rem", color: "var(--red)" }}>{(errors.options as any).message}</span>
               )}
 
-              {/* Option rows */}
-              {fields.map((field, index) => {
-                const letter = String.fromCharCode(65 + index);
-                const [showImg, setShowImg] = useState(false);
-                return (
-                  <div key={field.id} style={{
-                    border: "1px solid var(--border)", borderRadius: "0.625rem", overflow: "hidden",
-                    transition: "border-color 0.15s",
+              {/* ✅ Option rows rendered via OptionRow component — no hooks in map */}
+              {fields.map((field, index) => (
+                <OptionRow
+                  key={field.id}
+                  index={index}
+                  fieldId={field.id}
+                  control={control}
+                  errors={errors}
+                  isMultiple={isMultiple}
+                  fields={fields}
+                  setValue={setValue}
+                  optionImages={optionImages}
+                  setOptionImages={setOptionImages}
+                  onRemove={() => {
+                    remove(index);
+                    setOptionImages((prev) => prev.filter((_, i) => i !== index));
                   }}
-                    onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--border2)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
-                  >
-                    <div style={{
-                      display: "flex", alignItems: "flex-start",
-                      gap: "0.65rem", padding: "0.75rem",
-                    }}>
-                      {/* Correct badge */}
-                      <Controller name={`options.${index}.isCorrect`} control={control} render={({ field: f }) => (
-                        <button type="button"
-                          onClick={() => {
-                            if (!isMultiple) {
-                              fields.forEach((_, i) => {
-                                if (i !== index) setValue(`options.${i}.isCorrect`, false);
-                              });
-                            }
-                            f.onChange(!f.value);
-                          }}
-                          title={f.value ? "Correct answer" : "Mark as correct"}
-                          style={{
-                            flexShrink: 0, marginTop: "0.2rem",
-                            width: "1.55rem", height: "1.55rem", borderRadius: "50%",
-                            border: `2px solid ${f.value ? "var(--green)" : "var(--border2)"}`,
-                            background: f.value ? "var(--green-bg)" : "transparent",
-                            color: f.value ? "var(--green)" : "var(--text3)",
-                            cursor: "pointer", display: "flex", alignItems: "center",
-                            justifyContent: "center", fontSize: "0.7rem", fontWeight: 700,
-                            transition: "all 0.12s",
-                          }}>
-                          {f.value ? <CheckCircle2 size={13} /> : letter}
-                        </button>
-                      )} />
+                  canRemove={fields.length > 2}
+                />
+              ))}
 
-                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                        <Controller name={`options.${index}.text`} control={control} render={({ field: f }) => (
-                          <RichField value={f.value ?? ""} onChange={f.onChange} placeholder={`Option ${letter}`} />
-                        )} />
-                        {errors.options?.[index]?.text && (
-                          <span style={{ fontSize: "0.7rem", color: "var(--red)" }}>
-                            {errors.options[index]?.text?.message}
-                          </span>
-                        )}
-
-                        {/* Image toggle */}
-                        <button type="button" onClick={() => setShowImg((v) => !v)} style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          fontSize: "0.68rem", color: "var(--text3)",
-                          display: "flex", alignItems: "center", gap: "0.25rem",
-                          padding: 0, transition: "color 0.12s", alignSelf: "flex-start",
-                        }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text2)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text3)")}
-                        >
-                          <ImageIcon size={10} />
-                          {showImg ? "Remove image" : "Add image to this option"}
-                        </button>
-
-                        {showImg && (
-                          <ImgDrop compact
-                            value={optionImages[index]}
-                            onChange={(f) => {
-                              const next = [...optionImages];
-                              next[index] = f;
-                              setOptionImages(next);
-                            }}
-                            label={`Image for option ${letter}`}
-                          />
-                        )}
-                      </div>
-
-                      {/* Remove option */}
-                      {fields.length > 2 && (
-                        <button type="button" onClick={() => remove(index)} style={{
-                          flexShrink: 0, background: "none", border: "none",
-                          cursor: "pointer", color: "var(--text3)",
-                          padding: "0.2rem", borderRadius: "0.25rem", transition: "color 0.12s",
-                        }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--red)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text3)")}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Add option button */}
-              <button type="button"
-                onClick={() => { append({ text: "", isCorrect: false }); setOptionImages((p) => [...p, null]); }}
+              <button
+                type="button"
+                onClick={() => {
+                  append({ text: "", isCorrect: false });
+                  setOptionImages((p) => [...p, null]);
+                }}
                 style={{
                   width: "100%", padding: "0.6rem",
                   border: "1.5px dashed var(--border2)", borderRadius: "0.625rem",
@@ -564,17 +649,16 @@ export default function CreateQuestionPage() {
           {/* Solution */}
           <Card title="Solution / Explanation">
             <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
-              {/* Type selector */}
               <Controller name="solutionType" control={control} render={({ field }) => (
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                   {([
-                    { val: "none",  label: "None"           },
-                    { val: "text",  label: "Write Solution" },
-                    { val: "image", label: "Upload Image"   },
+                    { val: "none",  label: "None"            },
+                    { val: "text",  label: "Write Solution"  },
+                    { val: "image", label: "Upload Image"    },
                   ] as const).map((opt) => (
                     <button key={opt.val} type="button" onClick={() => field.onChange(opt.val)} style={{
-                      padding: "0.38rem 0.875rem", borderRadius: "0.4rem",
-                      fontSize: "0.75rem", fontWeight: field.value === opt.val ? 700 : 500,
+                      padding: "0.38rem 0.875rem", borderRadius: "0.4rem", fontSize: "0.75rem",
+                      fontWeight: field.value === opt.val ? 700 : 500,
                       border: `1.5px solid ${field.value === opt.val ? "var(--accent)" : "var(--border)"}`,
                       background: field.value === opt.val ? "var(--accent-bg)" : "var(--surface2)",
                       color: field.value === opt.val ? "var(--accent)" : "var(--text2)",
@@ -593,12 +677,10 @@ export default function CreateQuestionPage() {
                     multiline label="Solution" />
                 )} />
               )}
-
               {solutionType === "image" && (
                 <ImgDrop value={solutionImage} onChange={setSolutionImage}
                   label="Upload solution image (handwritten / diagram)" />
               )}
-
               {solutionType === "none" && (
                 <p style={{ fontSize: "0.78rem", color: "var(--text3)", textAlign: "center", padding: "0.5rem 0" }}>
                   No solution attached. Students won't see an explanation after submission.
@@ -615,12 +697,11 @@ export default function CreateQuestionPage() {
           <Card title="Classification">
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
 
-              {/* Subject — REQUIRED */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <FieldLabel>Subject</FieldLabel>
                 <Controller name="subjectId" control={control} render={({ field }) => (
                   <select
-                    value={field.value}
+                    value={field.value ?? ""}
                     onChange={(e) => {
                       field.onChange(e.target.value);
                       setSelSubject(e.target.value);
@@ -643,7 +724,6 @@ export default function CreateQuestionPage() {
                 )}
               </div>
 
-              {/* Chapter — OPTIONAL */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <FieldLabel optional>Chapter</FieldLabel>
                 <Controller name="chapterId" control={control} render={({ field }) => (
@@ -658,13 +738,12 @@ export default function CreateQuestionPage() {
                     style={{
                       ...selBase,
                       opacity: (!selSubject || !chapters?.length) ? 0.5 : 1,
-                      cursor: (!selSubject || !chapters?.length) ? "not-allowed" : "auto",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                     onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
                   >
                     <option value="">
-                      {!selSubject ? "Select subject first" : !chapters?.length ? "No chapters available" : "No chapter (general)"}
+                      {!selSubject ? "Select subject first" : !chapters?.length ? "No chapters" : "No chapter (general)"}
                     </option>
                     {chapters?.map((c: any) => (
                       <option key={c.id} value={String(c.id)}>{c.name}</option>
@@ -672,11 +751,10 @@ export default function CreateQuestionPage() {
                   </select>
                 )} />
                 <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>
-                  Leave blank to create a general subject question
+                  Leave blank for a general subject question
                 </span>
               </div>
 
-              {/* Subconcept — OPTIONAL */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <FieldLabel optional>Subconcept</FieldLabel>
                 <Controller name="subconceptId" control={control} render={({ field }) => (
@@ -687,7 +765,6 @@ export default function CreateQuestionPage() {
                     style={{
                       ...selBase,
                       opacity: (!selChapter || !subconcepts?.length) ? 0.5 : 1,
-                      cursor: (!selChapter || !subconcepts?.length) ? "not-allowed" : "auto",
                     }}
                     onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
                     onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
@@ -702,7 +779,6 @@ export default function CreateQuestionPage() {
                 )} />
               </div>
 
-              {/* Grade level — OPTIONAL */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <FieldLabel optional>Grade Level</FieldLabel>
                 <Controller name="gradeLevel" control={control} render={({ field }) => (
@@ -727,7 +803,6 @@ export default function CreateQuestionPage() {
           <Card title="Grading">
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
 
-              {/* Difficulty */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <FieldLabel>Difficulty</FieldLabel>
                 <Controller name="difficulty" control={control} render={({ field }) => (
@@ -753,16 +828,18 @@ export default function CreateQuestionPage() {
                 )} />
               </div>
 
-              {/* Marks */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <FieldLabel>Marks</FieldLabel>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <Controller name="marks" control={control} render={({ field }) => (
-                    <input type="number" min={1} max={100} value={field.value}
+                    <input
+                      type="number" min={1} max={100}
+                      value={field.value}
                       onChange={(e) => field.onChange(Number(e.target.value))}
-                      style={{ ...inpBase }}
+                      style={inpBase}
                       onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-                      onBlur={(e) => (e.target.style.borderColor = "var(--border)")} />
+                      onBlur={(e) => (e.target.style.borderColor = "var(--border)")}
+                    />
                   )} />
                   <span style={{ fontSize: "0.72rem", color: "var(--text3)", flexShrink: 0 }}>pts</span>
                 </div>
@@ -783,7 +860,7 @@ export default function CreateQuestionPage() {
               "Switch to LaTeX for math expressions",
               "Click the circle badge to mark correct answer(s)",
               "Each option can have its own image",
-              "Enable MSQ toggle for multiple correct answers",
+              "Enable MSQ for multiple correct answers",
               "Write or upload an image for the solution",
             ].map((tip) => (
               <p key={tip} style={{ fontSize: "0.68rem", color: "var(--text3)", marginBottom: "0.3rem" }}>

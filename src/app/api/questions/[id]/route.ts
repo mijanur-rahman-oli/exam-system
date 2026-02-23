@@ -1,92 +1,134 @@
-import { NextResponse } from "next/server";
+// app/api/questions/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
+type Params = { params: { id: string } };
+
+// ── GET /api/questions/[id] ───────────────────────────────────────────────────
+export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
     const question = await prisma.question.findUnique({
-      where: { id: parseInt(params.id) },
+      where: { id },
       include: {
-        subject:    { select: { name: true } },
-        chapter:    { select: { name: true } },
-        subconcept: { select: { name: true } },
+        subject:    { select: { id: true, name: true } },
+        chapter:    { select: { id: true, name: true } },
+        subconcept: { select: { id: true, name: true } },
+        creator:    { select: { id: true, username: true } },
       },
     });
 
     if (!question) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(question);
-  } catch (err) {
-    console.error("[GET /api/questions/[id]]", err);
+  } catch (error) {
+    console.error("GET /api/questions/[id] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
+// ── PUT /api/questions/[id] — update from Edit Question page ─────────────────
+// Accepts JSON (the edit page sends JSON, not FormData)
+export async function PUT(req: NextRequest, { params }: Params) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    if (!["question_setter", "admin", "teacher"].includes(session.user.role)) {
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+    // Ownership check
+    const existing = await prisma.question.findUnique({
+      where:  { id },
+      select: { createdBy: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (existing.createdBy !== parseInt(session.user.id) && session.user.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const id = parseInt(params.id);
-
-    // Check ownership (admin can delete any)
-    const question = await prisma.question.findUnique({ where: { id }, select: { createdBy: true } });
-    if (!question) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (session.user.role !== "admin" && question.createdBy !== parseInt(session.user.id)) {
-      return NextResponse.json({ error: "You can only delete your own questions" }, { status: 403 });
-    }
-
-    // Remove from exam_questions first to avoid FK violation
-    await prisma.examQuestion.deleteMany({ where: { questionId: id } });
-    await prisma.question.delete({ where: { id } });
-
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error("[DELETE /api/questions/[id]]", err);
-    return NextResponse.json({ error: "Delete failed", detail: err?.message }, { status: 500 });
-  }
-}
-
-export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const id = parseInt(params.id);
     const body = await req.json();
 
-    const question = await prisma.question.update({
+    // The edit page sends flat fields: subjectId, chapterId, question,
+    // optionA/B/C/D, correctAnswer, explanation, marks, difficulty
+    const {
+      subjectId, chapterId, subconceptId, gradeLevel,
+      question, optionA, optionB, optionC, optionD,
+      correctAnswer, isMultipleAnswer, explanation,
+      marks, difficulty,
+    } = body;
+
+    const updated = await prisma.question.update({
       where: { id },
       data: {
-        question:     body.question,
-        optionA:      body.optionA,
-        optionB:      body.optionB,
-        optionC:      body.optionC ?? null,
-        optionD:      body.optionD ?? null,
-        correctAnswer: body.correctAnswer,
-        difficulty:   body.difficulty,
-        marks:        body.marks,
+        subjectId:        parseInt(subjectId),
+        chapterId:        chapterId    ? parseInt(chapterId)    : null,
+        subconceptId:     subconceptId ? parseInt(subconceptId) : null,
+        gradeLevel:       gradeLevel   || null,
+        question,
+        optionA:          optionA,
+        optionB:          optionB,
+        optionC:          optionC  || null,
+        optionD:          optionD  || null,
+        correctAnswer,
+        isMultipleAnswer: isMultipleAnswer ?? false,
+        explanation:      explanation || null,
+        marks:            parseInt(marks) || 1,
+        difficulty:       difficulty ?? "medium",
+      },
+      include: {
+        subject:    { select: { id: true, name: true } },
+        chapter:    { select: { id: true, name: true } },
+        subconcept: { select: { id: true, name: true } },
       },
     });
 
-    return NextResponse.json(question);
-  } catch (err: any) {
-    console.error("[PUT /api/questions/[id]]", err);
-    return NextResponse.json({ error: "Update failed", detail: err?.message }, { status: 500 });
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("PUT /api/questions/[id] error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// ── DELETE /api/questions/[id] ────────────────────────────────────────────────
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+    // Ownership check
+    const existing = await prisma.question.findUnique({
+      where:  { id },
+      select: { createdBy: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (existing.createdBy !== parseInt(session.user.id) && session.user.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    // Remove from any exams first to avoid FK violations
+    await prisma.examQuestion.deleteMany({ where: { questionId: id } });
+    await prisma.examAnswer.deleteMany({   where: { questionId: id } });
+    await prisma.question.delete({ where: { id } });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/questions/[id] error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
