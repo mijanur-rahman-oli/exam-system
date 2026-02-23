@@ -1,3 +1,4 @@
+// app/admin/subjects/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -9,17 +10,34 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit, ChevronRight, BookOpen, Layers } from "lucide-react";
 
 export default function AdminSubjectsPage() {
   const { toast } = useToast();
-  const [isOpen, setIsOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [activeTab, setActiveTab] = useState("subjects");
+  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [selectedChapter, setSelectedChapter] = useState<any>(null);
 
-  const { data: subjects, refetch, isLoading } = useQuery({
-    queryKey: ["subjects"],
+  // Subjects
+  const [isSubjectOpen, setIsSubjectOpen] = useState(false);
+  const [subjectName, setSubjectName] = useState("");
+  const [subjectDesc, setSubjectDesc] = useState("");
+
+  // Chapters
+  const [isChapterOpen, setIsChapterOpen] = useState(false);
+  const [chapterName, setChapterName] = useState("");
+  const [chapterDesc, setChapterDesc] = useState("");
+
+  // Subconcepts
+  const [isSubconceptOpen, setIsSubconceptOpen] = useState(false);
+  const [subconceptName, setSubconceptName] = useState("");
+  const [subconceptDesc, setSubconceptDesc] = useState("");
+
+  // Queries
+  const { data: subjects, refetch: refetchSubjects } = useQuery({
+    queryKey: ["admin-subjects"],
     queryFn: async () => {
       const res = await fetch("/api/subjects");
       if (!res.ok) throw new Error("Failed to fetch subjects");
@@ -27,137 +45,363 @@ export default function AdminSubjectsPage() {
     },
   });
 
-  const createMutation = useMutation({
+  const { data: chapters, refetch: refetchChapters } = useQuery({
+    queryKey: ["admin-chapters", selectedSubject?.id],
+    queryFn: async () => {
+      if (!selectedSubject?.id) return [];
+      const res = await fetch(`/api/chapters?subjectId=${selectedSubject.id}`);
+      if (!res.ok) throw new Error("Failed to fetch chapters");
+      return res.json();
+    },
+    enabled: !!selectedSubject?.id,
+  });
+
+  const { data: subconcepts, refetch: refetchSubconcepts } = useQuery({
+    queryKey: ["admin-subconcepts", selectedChapter?.id],
+    queryFn: async () => {
+      if (!selectedChapter?.id) return [];
+      const res = await fetch(`/api/subconcepts?chapterId=${selectedChapter.id}`);
+      if (!res.ok) throw new Error("Failed to fetch subconcepts");
+      return res.json();
+    },
+    enabled: !!selectedChapter?.id,
+  });
+
+  // Mutations
+  const createSubject = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/subjects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name: subjectName, description: subjectDesc }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to create subject");
-      }
+      if (!res.ok) throw new Error("Failed to create subject");
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Subject created successfully" });
-      setIsOpen(false);
-      setName("");
-      setDescription("");
-      refetch();
+      toast({ title: "Subject created" });
+      setIsSubjectOpen(false);
+      setSubjectName("");
+      setSubjectDesc("");
+      refetchSubjects();
     },
-    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
-  const deleteMutation = useMutation({
+  const deleteSubject = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/subjects/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete subject");
     },
-    onSuccess: () => { toast({ title: "Subject deleted" }); refetch(); },
-    onError: () => toast({ title: "Error", description: "Failed to delete subject", variant: "destructive" }),
+    onSuccess: () => {
+      toast({ title: "Subject deleted" });
+      refetchSubjects();
+      if (selectedSubject) setSelectedSubject(null);
+    },
+  });
+
+  const createChapter = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/chapters", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subjectId: selectedSubject.id,
+          name: chapterName,
+          description: chapterDesc,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create chapter");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Chapter created" });
+      setIsChapterOpen(false);
+      setChapterName("");
+      setChapterDesc("");
+      refetchChapters();
+    },
+  });
+
+  const deleteChapter = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/chapters/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete chapter");
+    },
+    onSuccess: () => {
+      toast({ title: "Chapter deleted" });
+      refetchChapters();
+      if (selectedChapter) setSelectedChapter(null);
+    },
+  });
+
+  const createSubconcept = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/subconcepts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chapterId: selectedChapter.id,
+          name: subconceptName,
+          description: subconceptDesc,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create subconcept");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Subconcept created" });
+      setIsSubconceptOpen(false);
+      setSubconceptName("");
+      setSubconceptDesc("");
+      refetchSubconcepts();
+    },
+  });
+
+  const deleteSubconcept = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/subconcepts/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete subconcept");
+    },
+    onSuccess: () => {
+      toast({ title: "Subconcept deleted" });
+      refetchSubconcepts();
+    },
   });
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Subjects</h1>
-          <p className="text-muted-foreground mt-1">Manage exam subjects</p>
-        </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Add Subject</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add New Subject</DialogTitle></DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label htmlFor="subjectName">Name *</Label>
-                <Input
-                  id="subjectName"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Mathematics"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="subjectDesc">Description</Label>
-                <Textarea
-                  id="subjectDesc"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional description"
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-                <Button
-                  onClick={() => createMutation.mutate()}
-                  disabled={!name.trim() || createMutation.isPending}
-                >
-                  {createMutation.isPending ? "Creating..." : "Create"}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Academic Hierarchy</h1>
+        <p className="text-muted-foreground mt-1">Manage Subjects, Chapters, and Sub-concepts</p>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>All Subjects ({subjects?.length ?? 0})</CardTitle></CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <p className="text-center py-8 text-muted-foreground">Loading subjects...</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {subjects?.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No subjects yet. Add your first subject.
-                    </TableCell>
-                  </TableRow>
+      <div className="grid grid-cols-12 gap-6">
+        {/* Left sidebar - Subject list */}
+        <div className="col-span-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Subjects</CardTitle>
+              <Dialog open={isSubjectOpen} onOpenChange={setIsSubjectOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Add Subject</DialogTitle></DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <Input
+                      placeholder="Subject name"
+                      value={subjectName}
+                      onChange={(e) => setSubjectName(e.target.value)}
+                    />
+                    <Textarea
+                      placeholder="Description (optional)"
+                      value={subjectDesc}
+                      onChange={(e) => setSubjectDesc(e.target.value)}
+                    />
+                    <Button
+                      onClick={() => createSubject.mutate()}
+                      disabled={!subjectName.trim()}
+                      className="w-full"
+                    >
+                      Create Subject
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {subjects?.map((subject: any) => (
+                  <div
+                    key={subject.id}
+                    className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 ${
+                      selectedSubject?.id === subject.id ? "bg-muted" : ""
+                    }`}
+                    onClick={() => setSelectedSubject(subject)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{subject.name}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete subject "${subject.name}"?`)) {
+                          deleteSubject.mutate(subject.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Middle - Chapters */}
+        <div className="col-span-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">
+                {selectedSubject ? (
+                  <div className="flex items-center gap-2">
+                    <span>{selectedSubject.name}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Chapters</span>
+                  </div>
+                ) : (
+                  "Chapters"
                 )}
-                {subjects?.map((s: any) => (
-                  <TableRow key={s.id}>
-                    <TableCell>{s.id}</TableCell>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{s.description || "—"}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(s.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
+              </CardTitle>
+              {selectedSubject && (
+                <Dialog open={isChapterOpen} onOpenChange={setIsChapterOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Add Chapter to {selectedSubject.name}</DialogTitle></DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <Input
+                        placeholder="Chapter name"
+                        value={chapterName}
+                        onChange={(e) => setChapterName(e.target.value)}
+                      />
+                      <Textarea
+                        placeholder="Description (optional)"
+                        value={chapterDesc}
+                        onChange={(e) => setChapterDesc(e.target.value)}
+                      />
+                      <Button
+                        onClick={() => createChapter.mutate()}
+                        disabled={!chapterName.trim()}
+                        className="w-full"
+                      >
+                        Create Chapter
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              {!selectedSubject ? (
+                <p className="text-center text-muted-foreground py-8">Select a subject first</p>
+              ) : (
+                <div className="divide-y">
+                  {chapters?.map((chapter: any) => (
+                    <div
+                      key={chapter.id}
+                      className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 ${
+                        selectedChapter?.id === chapter.id ? "bg-muted" : ""
+                      }`}
+                      onClick={() => setSelectedChapter(chapter)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-muted-foreground" />
+                        <span>{chapter.name}</span>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          if (confirm(`Delete subject "${s.name}"? All related questions and exams may be affected.`)) {
-                            deleteMutation.mutate(s.id);
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete chapter "${chapter.name}"?`)) {
+                            deleteChapter.mutate(chapter.id);
                           }
                         }}
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right - Subconcepts */}
+        <div className="col-span-5">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">
+                {selectedChapter ? (
+                  <div className="flex items-center gap-2">
+                    <span>{selectedChapter.name}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Sub-concepts</span>
+                  </div>
+                ) : (
+                  "Sub-concepts"
+                )}
+              </CardTitle>
+              {selectedChapter && (
+                <Dialog open={isSubconceptOpen} onOpenChange={setIsSubconceptOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" variant="outline">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Add Sub-concept to {selectedChapter.name}</DialogTitle></DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <Input
+                        placeholder="Sub-concept name"
+                        value={subconceptName}
+                        onChange={(e) => setSubconceptName(e.target.value)}
+                      />
+                      <Textarea
+                        placeholder="Description (optional)"
+                        value={subconceptDesc}
+                        onChange={(e) => setSubconceptDesc(e.target.value)}
+                      />
+                      <Button
+                        onClick={() => createSubconcept.mutate()}
+                        disabled={!subconceptName.trim()}
+                        className="w-full"
+                      >
+                        Create Sub-concept
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              {!selectedChapter ? (
+                <p className="text-center text-muted-foreground py-8">Select a chapter first</p>
+              ) : (
+                <div className="divide-y">
+                  {subconcepts?.map((sc: any) => (
+                    <div key={sc.id} className="flex items-center justify-between p-3">
+                      <span>{sc.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm(`Delete sub-concept "${sc.name}"?`)) {
+                            deleteSubconcept.mutate(sc.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

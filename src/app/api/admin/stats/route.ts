@@ -1,4 +1,4 @@
-// src/app/api/admin/stats/route.ts
+// app/api/admin/stats/route.ts (updated)
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -12,31 +12,57 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get total users
-    const totalUsers = await prisma.user.count();
-    
-    // Get users by role
-    const studentCount = await prisma.user.count({ where: { role: "student" } });
-    const teacherCount = await prisma.user.count({ where: { role: "teacher" } });
-    const questionSetterCount = await prisma.user.count({ where: { role: "question_setter" } });
-    
-    // Get total exams
-    const totalExams = await prisma.exam.count();
-    
-    // Get total questions
-    const totalQuestions = await prisma.question.count();
-    
-    // Get exam attempts
-    const totalAttempts = await prisma.examAttempt.count();
+    const [
+      totalUsers,
+      studentCount,
+      teacherCount,
+      questionSetterCount,
+      adminCount,
+      totalExams,
+      totalQuestions,
+      totalAttempts,
+      totalSubjects,
+      totalChapters,
+      totalSubconcepts,
+      activeExams,
+      avgScore,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: "student" } }),
+      prisma.user.count({ where: { role: "teacher" } }),
+      prisma.user.count({ where: { role: "question_setter" } }),
+      prisma.user.count({ where: { role: "admin" } }),
+      prisma.exam.count(),
+      prisma.question.count(),
+      prisma.examAttempt.count(),
+      prisma.subject.count(),
+      prisma.chapter.count(),
+      prisma.subconcept.count(),
+      prisma.exam.count({ where: { isActive: true } }),
+      prisma.examAttempt.aggregate({ 
+        _avg: { score: true },
+        _count: true,
+      }).then(r => ({
+        avg: r._avg.score || 0,
+        count: r._count
+      })),
+    ]);
 
     return NextResponse.json({
       totalUsers,
       studentCount,
       teacherCount,
       questionSetterCount,
+      adminCount,
       totalExams,
       totalQuestions,
       totalAttempts,
+      totalSubjects,
+      totalChapters,
+      totalSubconcepts,
+      activeExams,
+      avgScore: Math.round((avgScore.avg || 0) * 100) / 100,
+      totalAttemptsCount: avgScore.count,
     });
   } catch (error) {
     console.error("Admin stats error:", error);

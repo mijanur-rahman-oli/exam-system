@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -6,8 +7,6 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
-// ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
   admin
@@ -21,8 +20,6 @@ enum Difficulty {
   medium
   hard
 }
-
-// ─── Users & Auth ─────────────────────────────────────────────────────────────
 
 model User {
   id        Int      @id @default(autoincrement())
@@ -101,11 +98,9 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-// ─── Content Hierarchy ────────────────────────────────────────────────────────
-
 model Subject {
   id          Int      @id @default(autoincrement())
-  name        String
+  name        String   @unique
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -117,11 +112,11 @@ model Subject {
 }
 
 model Chapter {
-  id          Int     @id @default(autoincrement())
-  subjectId   Int     @map("subject_id")
-  name        String  @map("chapter_name")
+  id          Int      @id @default(autoincrement())
+  subjectId   Int      @map("subject_id")
+  name        String   @map("chapter_name")
   description String?
-  createdBy   Int?    @map("created_by")
+  createdBy   Int?     @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
 
   subject     Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -129,6 +124,7 @@ model Chapter {
   subconcepts Subconcept[]
   questions   Question[]
 
+  @@unique([subjectId, name])
   @@map("chapters")
 }
 
@@ -142,10 +138,9 @@ model Subconcept {
   chapter   Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   questions Question[]
 
+  @@unique([chapterId, name])
   @@map("subconcepts")
 }
-
-// ─── Questions ────────────────────────────────────────────────────────────────
 
 model Question {
   id           Int        @id @default(autoincrement())
@@ -154,37 +149,30 @@ model Question {
   subconceptId Int?       @map("subconcept_id")
   gradeLevel   String?    @map("grade_level")
 
-  // Question body
   question      String  @db.Text
-  questionImage String? @map("question_image") // path: /uploads/question-images/...
+  questionImage String? @map("question_image")
 
-  // Options (text)
   optionA String  @map("option_a")
   optionB String  @map("option_b")
   optionC String? @map("option_c")
   optionD String? @map("option_d")
 
-  // Options (images, optional per-option)
   optionAImage String? @map("option_a_image")
   optionBImage String? @map("option_b_image")
   optionCImage String? @map("option_c_image")
   optionDImage String? @map("option_d_image")
 
-  // Answer
-  correctAnswer    String  @map("correct_answer") // "A" | "B" | "C" | "D" | "A,B" for MSQ
+  correctAnswer    String  @map("correct_answer")
   isMultipleAnswer Boolean @default(false) @map("is_multiple_answer")
   explanation      String? @db.Text
 
-  // Metadata
   marks      Int        @default(1)
   difficulty Difficulty @default(medium)
-  solutionPdf String?   @map("solution_pdf") // path: /uploads/solution-pdfs/...
 
   createdBy Int      @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  // Relations
   subject       Subject       @relation(fields: [subjectId], references: [id])
   chapter       Chapter?      @relation(fields: [chapterId], references: [id])
   subconcept    Subconcept?   @relation(fields: [subconceptId], references: [id])
@@ -195,15 +183,13 @@ model Question {
   @@map("questions")
 }
 
-// ─── Exams ────────────────────────────────────────────────────────────────────
-
 model Exam {
   id           Int       @id @default(autoincrement())
   examName     String    @map("exam_name")
   description  String?   @db.Text
   subjectId    Int       @map("subject_id")
   gradeLevel   String?   @map("grade_level")
-  duration     Int       // minutes
+  duration     Int
   totalMarks   Int?      @map("total_marks")
   passingMarks Int?      @map("passing_marks")
   scheduleTime DateTime? @map("schedule_time")
@@ -234,8 +220,6 @@ model ExamQuestion {
   @@map("exam_questions")
 }
 
-// ─── Attempts & Results ───────────────────────────────────────────────────────
-
 model ExamAttempt {
   id          Int       @id @default(autoincrement())
   examId      Int       @map("exam_id")
@@ -256,7 +240,7 @@ model ExamAnswer {
   id             Int     @id @default(autoincrement())
   attemptId      Int     @map("attempt_id")
   questionId     Int     @map("question_id")
-  selectedAnswer String? @map("selected_answer") // "A" | "B" | "A,B" for MSQ
+  selectedAnswer String? @map("selected_answer")
   isCorrect      Boolean @default(false) @map("is_correct")
   marksEarned    Float   @default(0) @map("marks_earned")
 

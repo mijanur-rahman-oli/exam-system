@@ -1,14 +1,18 @@
+// app/api/admin/users/route.ts (updated)
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
+    const { searchParams } = new URL(req.url);
+    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined;
 
     const users = await prisma.user.findMany({
       select: {
@@ -21,6 +25,7 @@ export async function GET() {
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },
+      take: limit,
     });
 
     return NextResponse.json(users);

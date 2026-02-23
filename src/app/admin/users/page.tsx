@@ -1,3 +1,4 @@
+// app/admin/users/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -6,13 +7,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { Search, Trash2, ShieldCheck } from "lucide-react";
+import { Search, Trash2, ShieldCheck, Plus, UserPlus } from "lucide-react";
 
 export default function AdminUsersPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newUser, setNewUser] = useState({
+    username: "",
+    email: "",
+    password: "",
+    role: "student" as string,
+    phone: "",
+    grade: "",
+    fullName: "",
+    subject: "",
+  });
 
   const { data: users, refetch, isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -21,6 +36,31 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     },
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newUser),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create user");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "User created successfully" });
+      setIsCreateOpen(false);
+      setNewUser({
+        username: "", email: "", password: "", role: "student",
+        phone: "", grade: "", fullName: "", subject: "",
+      });
+      refetch();
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -61,9 +101,136 @@ export default function AdminUsersPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Manage Users</h1>
-        <p className="text-muted-foreground mt-1">View and manage all registered users</p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Manage Users</h1>
+          <p className="text-muted-foreground mt-1">Create and manage all system users</p>
+        </div>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add User
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New User</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">Username *</Label>
+                  <Input
+                    id="username"
+                    value={newUser.username}
+                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                    placeholder="johndoe"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    placeholder="john@example.com"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder="Enter password"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">Role *</Label>
+                <Select
+                  value={newUser.role}
+                  onValueChange={(value) => setNewUser({ ...newUser, role: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="teacher">Teacher</SelectItem>
+                    <SelectItem value="question_setter">Question Setter</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                  placeholder="+1234567890"
+                />
+              </div>
+
+              {(newUser.role === "student" || newUser.role === "teacher" || newUser.role === "question_setter") && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      value={newUser.fullName}
+                      onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+                      placeholder="John Doe"
+                    />
+                  </div>
+
+                  {newUser.role === "student" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="grade">Grade</Label>
+                      <Input
+                        id="grade"
+                        value={newUser.grade}
+                        onChange={(e) => setNewUser({ ...newUser, grade: e.target.value })}
+                        placeholder="10th Grade"
+                      />
+                    </div>
+                  )}
+
+                  {(newUser.role === "teacher" || newUser.role === "question_setter") && (
+                    <div className="space-y-2">
+                      <Label htmlFor="subject">Subject Specialization</Label>
+                      <Input
+                        id="subject"
+                        value={newUser.subject}
+                        onChange={(e) => setNewUser({ ...newUser, subject: e.target.value })}
+                        placeholder="Mathematics"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => createUserMutation.mutate()}
+                  disabled={!newUser.username || !newUser.email || !newUser.password || createUserMutation.isPending}
+                >
+                  {createUserMutation.isPending ? "Creating..." : "Create User"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="mb-4 relative">
