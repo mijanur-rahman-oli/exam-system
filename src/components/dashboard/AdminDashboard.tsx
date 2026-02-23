@@ -64,7 +64,7 @@ export function AdminDashboard() {
     },
     {
       title: "Create Exam",
-      description: "Build new assessment with questions",
+      description: "Build new assessment with subject wise questions",
       icon: BookOpen,
       href: "/admin/exams/create",
       color: "from-green-500 to-green-600",
@@ -84,7 +84,7 @@ export function AdminDashboard() {
     },
     {
       title: "Manage Subjects",
-      description: "Organize academic hierarchy",
+      description: "Export Academic Subject Category List",
       icon: Layers,
       href: "/admin/subjects",
       color: "from-orange-500 to-orange-600",
