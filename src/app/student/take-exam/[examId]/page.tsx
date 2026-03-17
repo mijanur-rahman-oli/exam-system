@@ -3,27 +3,24 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/components/ui/use-toast";
-import { Clock, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight, AlertCircle, CheckCircle } from "lucide-react";
 
 type Answer = { questionId: number; selectedAnswer: string };
 
 export default function TakeExamPage() {
-  const { examId } = useParams();
+  const { examId } = useParams<{ examId: string }>();
   const router = useRouter();
-  const { toast } = useToast();
+
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [attemptId, setAttemptId] = useState<number | null>(null);
-  const [examStarted, setExamStarted] = useState(false);
+  const [answers,      setAnswers]      = useState<Record<number, string>>({});
+  const [timeLeft,     setTimeLeft]     = useState<number | null>(null);
+  const [attemptId,    setAttemptId]    = useState<number | null>(null);
+  const [examStarted,  setExamStarted]  = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [startError,   setStartError]   = useState("");
   const initialized = useRef(false);
 
-  // Fetch exam details
+  // Fetch exam (no correct answers)
   const { data: exam, isLoading: examLoading } = useQuery({
     queryKey: ["exam-take", examId],
     queryFn: async () => {
@@ -33,12 +30,10 @@ export default function TakeExamPage() {
     },
   });
 
-  // Start exam mutation
+  // Start exam
   const startMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/student/exams/${examId}/start`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/student/exams/${examId}/start`, { method: "POST" });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed to start exam");
@@ -47,20 +42,18 @@ export default function TakeExamPage() {
     },
     onSuccess: (data) => {
       setAttemptId(data.attemptId);
-      setTimeLeft(data.duration * 60);
+      setTimeLeft(data.remaining ?? data.duration * 60);
       setExamStarted(true);
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
+    onError: (err: any) => setStartError(err.message),
   });
 
-  // Submit exam
+  // Submit
   const submitExam = useCallback(async (forced = false) => {
     if (isSubmitting || !attemptId) return;
     setIsSubmitting(true);
 
-    const formattedAnswers: Answer[] = Object.entries(answers).map(([qId, ans]) => ({
+    const formatted: Answer[] = Object.entries(answers).map(([qId, ans]) => ({
       questionId: parseInt(qId),
       selectedAnswer: ans,
     }));
@@ -69,240 +62,321 @@ export default function TakeExamPage() {
       const res = await fetch(`/api/student/exams/${examId}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attemptId, answers: formattedAnswers }),
+        body: JSON.stringify({ attemptId, answers: formatted }),
       });
-
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "Failed to submit exam");
+        throw new Error(err.error || "Submit failed");
       }
-
       const data = await res.json();
-      if (forced) toast({ title: "Time's up!", description: "Your exam has been auto-submitted." });
-      else toast({ title: "Exam submitted!", description: `Your score: ${data.score}` });
-
       router.push(`/student/results/${data.resultId}`);
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      alert(err.message);
       setIsSubmitting(false);
     }
-  }, [attemptId, answers, examId, isSubmitting, router, toast]);
+  }, [attemptId, answers, examId, isSubmitting, router]);
 
-  // Start exam on mount (once)
+  // Auto-start once exam data is loaded
   useEffect(() => {
-    if (initialized.current || !exam) return;
+    if (initialized.current || !exam || examLoading) return;
     initialized.current = true;
     startMutation.mutate();
-  }, [exam]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [exam, examLoading]); // eslint-disable-line
 
-  // Countdown timer
+  // Countdown
   useEffect(() => {
-    if (!examStarted || timeLeft === null) return;
-
-    if (timeLeft <= 0) {
-      submitExam(true);
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
+    if (!examStarted || timeLeft === null || timeLeft <= 0) return;
+    const t = setInterval(() => {
+      setTimeLeft((p) => {
+        if (p === null || p <= 1) { clearInterval(t); return 0; }
+        return p - 1;
       });
     }, 1000);
+    return () => clearInterval(t);
+  }, [examStarted, timeLeft]);
 
-    return () => clearInterval(timer);
-  }, [examStarted, timeLeft, submitExam]);
+  // Auto-submit on timeout
+  useEffect(() => {
+    if (examStarted && timeLeft === 0) submitExam(true);
+  }, [timeLeft]); // eslint-disable-line
 
-  const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, "0");
-    const s = (secs % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  };
+  const fmt = (s: number) =>
+    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
-  const questions = exam?.examQuestions ?? [];
-  const currentQuestion = questions[currentIndex]?.question;
-  const totalQuestions = questions.length;
-  const answeredCount = Object.keys(answers).length;
-  const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-  const isLowTime = timeLeft !== null && timeLeft < 120; // < 2 min
+  const questions    = exam?.examQuestions ?? [];
+  const total        = questions.length;
+  const curr         = questions[currentIndex];
+  const qId          = curr?.question?.id;
+  const answered     = Object.keys(answers).length;
+  const progress     = total > 0 ? (answered / total) * 100 : 0;
+  const isLowTime    = timeLeft !== null && timeLeft < 120;
 
-  if (examLoading || startMutation.isPending) {
+  const opts = curr ? [
+    { key: "A", text: curr.question?.optionA },
+    { key: "B", text: curr.question?.optionB },
+    { key: "C", text: curr.question?.optionC },
+    { key: "D", text: curr.question?.optionD },
+  ].filter((o) => o.text) : [];
+
+  // ── Loading / error states ────────────────────────────────────────────────
+  if (examLoading || startMutation.isPending || !examStarted || !exam) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading exam...</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: "1rem" }}>
+        <div style={{ width: "2.5rem", height: "2.5rem", border: "3px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <p style={{ color: "var(--text3)", fontSize: "0.85rem" }}>Loading exam…</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  if (startError) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "2rem", maxWidth: "420px", width: "100%", textAlign: "center" }}>
+          <AlertCircle size={36} color="var(--red)" style={{ margin: "0 auto 1rem", display: "block" }} />
+          <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text)", margin: "0 0 0.5rem" }}>Cannot Start Exam</h2>
+          <p style={{ fontSize: "0.85rem", color: "var(--text2)", marginBottom: "1.25rem" }}>{startError}</p>
+          <button
+            onClick={() => router.push("/student/exams")}
+            style={{ padding: "0.6rem 1.5rem", borderRadius: "0.5rem", background: "var(--accent)", border: "none", color: "#fff", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+          >
+            Back to Exams
+          </button>
         </div>
       </div>
     );
   }
 
-  if (!exam || questions.length === 0) {
+  if (examStarted && total === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="pt-6 text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold mb-2">Exam Unavailable</h2>
-            <p className="text-muted-foreground mb-4">
-              This exam has no questions or is not available.
-            </p>
-            <Button onClick={() => router.push("/student")}>Back to Dashboard</Button>
-          </CardContent>
-        </Card>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "2rem", textAlign: "center" }}>
+          <AlertCircle size={36} color="var(--red)" style={{ margin: "0 auto 1rem", display: "block" }} />
+          <p style={{ color: "var(--text2)" }}>This exam has no questions or is unavailable.</p>
+          <button onClick={() => router.push("/student/exams")} style={{ marginTop: "1rem", padding: "0.5rem 1.25rem", borderRadius: "0.4rem", background: "var(--accent)", border: "none", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+            Back
+          </button>
+        </div>
       </div>
     );
   }
 
-  const options = [
-    { key: "A", text: currentQuestion?.optionA },
-    { key: "B", text: currentQuestion?.optionB },
-    { key: "C", text: currentQuestion?.optionC },
-    { key: "D", text: currentQuestion?.optionD },
-  ].filter((o) => o.text);
-
+  // ── Exam UI ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b shadow-sm">
-        <div className="container mx-auto px-6 py-3 flex items-center justify-between">
+    <div style={{ display: "flex", flexDirection: "column", gap: "0", margin: "-2rem" }}>
+
+      {/* Sticky header */}
+      <div style={{
+        position: "sticky", top: 0, zIndex: 20,
+        background: "var(--surface)", borderBottom: "1px solid var(--border)",
+        padding: "0.875rem 2rem", boxShadow: "var(--shadow)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <h1 className="font-bold text-lg truncate max-w-sm">{exam.examName}</h1>
-            <p className="text-sm text-muted-foreground">
-              Question {currentIndex + 1} of {totalQuestions}
+            <h2 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text)", margin: 0, maxWidth: "400px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {exam.examName}
+            </h2>
+            <p style={{ fontSize: "0.72rem", color: "var(--text3)", margin: 0 }}>
+              Q{currentIndex + 1} of {total} · {answered} answered
             </p>
           </div>
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full font-mono font-bold text-lg ${isLowTime ? "bg-red-100 text-red-700 animate-pulse" : "bg-blue-100 text-blue-700"}`}>
-            <Clock className="h-5 w-5" />
-            {timeLeft !== null ? formatTime(timeLeft) : "--:--"}
+
+          {/* Timer */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "0.4rem",
+            padding: "0.5rem 1.1rem", borderRadius: "999px",
+            fontWeight: 800, fontSize: "1.1rem", fontFamily: "monospace",
+            background: isLowTime ? "var(--red-bg)" : "var(--accent-bg)",
+            color: isLowTime ? "var(--red)" : "var(--accent)",
+            border: `1px solid ${isLowTime ? "var(--red)" : "var(--accent-dim)"}`,
+            animation: isLowTime ? "pulse 1s infinite" : "none",
+          }}>
+            <Clock size={15} />
+            {timeLeft !== null ? fmt(timeLeft) : "--:--"}
           </div>
         </div>
-        <div className="px-6 pb-2">
-          <Progress value={progress} className="h-1.5" />
-          <p className="text-xs text-muted-foreground mt-1">{answeredCount} of {totalQuestions} answered</p>
+
+        {/* Progress bar */}
+        <div style={{ height: "3px", background: "var(--border)", borderRadius: "2px", marginTop: "0.75rem" }}>
+          <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: "2px", transition: "width 0.3s" }} />
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-6 max-w-4xl">
-        <div className="grid md:grid-cols-4 gap-6">
-          {/* Question panel */}
-          <div className="md:col-span-3 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-normal leading-relaxed">
-                  <span className="font-bold text-blue-600 mr-2">Q{currentIndex + 1}.</span>
-                  {currentQuestion?.question}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {options.map((opt) => {
-                  const questionId = questions[currentIndex]?.questionId;
-                  const isSelected = answers[questionId] === opt.key;
-                  return (
-                    <button
-                      key={opt.key}
-                      onClick={() => setAnswers((prev) => ({ ...prev, [questionId]: opt.key }))}
-                      className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${
-                        isSelected
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                      }`}
-                    >
-                      <span className={`font-bold mr-2 ${isSelected ? "text-blue-600" : "text-muted-foreground"}`}>
-                        {opt.key}.
-                      </span>
-                      {opt.text}
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
+      {/* Body */}
+      <div style={{ padding: "2rem", display: "grid", gridTemplateColumns: "1fr 200px", gap: "1.5rem", alignItems: "start" }}>
 
-            {/* Navigation */}
-            <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-                disabled={currentIndex === 0}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />Previous
-              </Button>
+        {/* Question + options */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {/* Question card */}
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1.5rem", boxShadow: "var(--shadow)" }}>
+            <p style={{ fontSize: "1rem", lineHeight: 1.7, color: "var(--text)", margin: 0 }}>
+              <span style={{ fontWeight: 800, color: "var(--accent)", marginRight: "0.5rem" }}>Q{currentIndex + 1}.</span>
+              {curr?.question?.question}
+            </p>
+          </div>
 
-              {currentIndex === totalQuestions - 1 ? (
-                <Button
-                  onClick={() => {
-                    const unanswered = totalQuestions - answeredCount;
-                    if (unanswered > 0) {
-                      if (!confirm(`You have ${unanswered} unanswered question(s). Submit anyway?`)) return;
-                    } else {
-                      if (!confirm("Submit your exam?")) return;
-                    }
-                    submitExam(false);
+          {/* Options */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+            {opts.map((opt) => {
+              const selected = answers[qId] === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setAnswers((p) => ({ ...p, [qId]: opt.key }))}
+                  style={{
+                    textAlign: "left", padding: "0.875rem 1.1rem",
+                    borderRadius: "0.625rem", cursor: "pointer", transition: "all 0.12s",
+                    border: `2px solid ${selected ? "var(--accent)" : "var(--border)"}`,
+                    background: selected ? "var(--accent-bg)" : "var(--surface)",
+                    display: "flex", alignItems: "center", gap: "0.875rem",
+                    fontSize: "0.88rem", color: "var(--text)",
                   }}
-                  disabled={isSubmitting}
-                  className="bg-green-600 hover:bg-green-700"
+                  onMouseEnter={(e) => {
+                    if (!selected) e.currentTarget.style.borderColor = "var(--border2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selected) e.currentTarget.style.borderColor = "var(--border)";
+                  }}
                 >
-                  {isSubmitting ? "Submitting..." : "Submit Exam"}
-                </Button>
-              ) : (
-                <Button
-                  onClick={() => setCurrentIndex((i) => Math.min(totalQuestions - 1, i + 1))}
-                >
-                  Next<ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              )}
-            </div>
+                  <div style={{
+                    width: "1.75rem", height: "1.75rem", borderRadius: "50%", flexShrink: 0,
+                    border: `2px solid ${selected ? "var(--accent)" : "var(--border2)"}`,
+                    background: selected ? "var(--accent)" : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "0.7rem", fontWeight: 800,
+                    color: selected ? "#fff" : "var(--text3)",
+                    transition: "all 0.12s",
+                  }}>
+                    {selected ? <CheckCircle size={12} /> : opt.key}
+                  </div>
+                  {opt.text}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Question grid navigator */}
-          <div className="md:col-span-1">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Navigator</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {questions.map((_: any, idx: number) => {
-                    const qId = questions[idx]?.questionId;
-                    const isAnswered = !!answers[qId];
-                    const isCurrent = idx === currentIndex;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentIndex(idx)}
-                        className={`h-8 w-full rounded text-xs font-medium transition-all ${
-                          isCurrent
-                            ? "ring-2 ring-blue-500 bg-blue-100 text-blue-700"
-                            : isAnswered
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        {idx + 1}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded bg-green-100 border border-green-300" />Answered
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded bg-gray-100 border border-gray-300" />Not answered
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded bg-blue-100 border border-blue-400" />Current
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Prev / Next */}
+          <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "0.5rem" }}>
+            <button
+              onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+              disabled={currentIndex === 0}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.35rem",
+                padding: "0.55rem 1.1rem", borderRadius: "0.5rem",
+                border: "1.5px solid var(--border)", background: "none",
+                color: "var(--text2)", cursor: currentIndex === 0 ? "not-allowed" : "pointer",
+                opacity: currentIndex === 0 ? 0.4 : 1, fontWeight: 600, fontSize: "0.82rem",
+              }}
+            >
+              <ChevronLeft size={15} /> Previous
+            </button>
+
+            {currentIndex < total - 1 ? (
+              <button
+                onClick={() => setCurrentIndex((i) => Math.min(total - 1, i + 1))}
+                style={{
+                  display: "flex", alignItems: "center", gap: "0.35rem",
+                  padding: "0.55rem 1.1rem", borderRadius: "0.5rem",
+                  border: "none", background: "var(--accent)",
+                  color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "0.82rem",
+                }}
+              >
+                Next <ChevronRight size={15} />
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  const unanswered = total - answered;
+                  const msg = unanswered > 0
+                    ? `You have ${unanswered} unanswered question(s). Submit anyway?`
+                    : "Submit your exam?";
+                  if (confirm(msg)) submitExam(false);
+                }}
+                disabled={isSubmitting}
+                style={{
+                  padding: "0.55rem 1.5rem", borderRadius: "0.5rem",
+                  border: "none", background: isSubmitting ? "var(--border)" : "var(--green)",
+                  color: "#fff", cursor: isSubmitting ? "not-allowed" : "pointer",
+                  fontWeight: 700, fontSize: "0.82rem", opacity: isSubmitting ? 0.7 : 1,
+                }}
+              >
+                {isSubmitting ? "Submitting…" : "Submit Exam ✓"}
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Question navigator */}
+        <div style={{ position: "sticky", top: "80px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1rem", boxShadow: "var(--shadow)" }}>
+          <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 0.75rem" }}>
+            Navigator
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "0.3rem", marginBottom: "1rem" }}>
+            {questions.map((_: any, idx: number) => {
+              const qid    = questions[idx]?.question?.id;
+              const isAns  = !!answers[qid];
+              const isCurr = idx === currentIndex;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  style={{
+                    height: "2rem", borderRadius: "0.35rem",
+                    fontSize: "0.7rem", fontWeight: 700, border: "none", cursor: "pointer",
+                    background: isCurr ? "var(--accent)" : isAns ? "var(--green-bg)" : "var(--surface2)",
+                    color: isCurr ? "#fff" : isAns ? "var(--green)" : "var(--text3)",
+                    outline: isCurr ? "2px solid var(--accent-dim)" : "none",
+                    transition: "all 0.1s",
+                  }}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem", fontSize: "0.68rem", color: "var(--text3)" }}>
+            {[
+              { bg: "var(--accent)", color: "#fff", label: "Current" },
+              { bg: "var(--green-bg)", color: "var(--green)", label: "Answered" },
+              { bg: "var(--surface2)", color: "var(--text3)", label: "Not answered" },
+            ].map(({ bg, color, label }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <span style={{ width: "0.75rem", height: "0.75rem", borderRadius: "0.2rem", background: bg, display: "inline-block", border: "1px solid var(--border)" }} />
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {/* Submit from sidebar */}
+          <button
+            onClick={() => {
+              const unanswered = total - answered;
+              const msg = unanswered > 0
+                ? `${unanswered} unanswered. Submit anyway?`
+                : "Submit your exam?";
+              if (confirm(msg)) submitExam(false);
+            }}
+            disabled={isSubmitting}
+            style={{
+              marginTop: "1rem", width: "100%", padding: "0.55rem",
+              borderRadius: "0.45rem", border: "none",
+              background: "var(--green)", color: "#fff",
+              fontWeight: 700, fontSize: "0.78rem", cursor: "pointer",
+              opacity: isSubmitting ? 0.6 : 1,
+            }}
+          >
+            Submit ({answered}/{total})
+          </button>
+        </div>
       </div>
+
+      <style>{`
+        @keyframes spin  { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+      `}</style>
     </div>
   );
 }

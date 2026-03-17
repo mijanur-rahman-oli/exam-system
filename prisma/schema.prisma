@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +6,8 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
   admin
@@ -21,17 +22,19 @@ enum Difficulty {
   hard
 }
 
+// ─── Users & Auth ─────────────────────────────────────────────────────────────
+
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  role      Role     @default(student)
-  phone     String?
-  grade     String?
-  isVerified Boolean @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         Int      @id @default(autoincrement())
+  username   String   @unique
+  email      String   @unique
+  password   String
+  role       Role     @default(student)
+  phone      String?
+  grade      String?
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   questionSetterDetails   QuestionSetterDetails?
   studentDetails          StudentDetails?
@@ -98,9 +101,11 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+// ─── Content Hierarchy ────────────────────────────────────────────────────────
+
 model Subject {
   id          Int      @id @default(autoincrement())
-  name        String   @unique
+  name        String
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -124,7 +129,6 @@ model Chapter {
   subconcepts Subconcept[]
   questions   Question[]
 
-  @@unique([subjectId, name])
   @@map("chapters")
 }
 
@@ -138,9 +142,10 @@ model Subconcept {
   chapter   Chapter    @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   questions Question[]
 
-  @@unique([chapterId, name])
   @@map("subconcepts")
 }
+
+// ─── Questions ────────────────────────────────────────────────────────────────
 
 model Question {
   id           Int        @id @default(autoincrement())
@@ -183,24 +188,26 @@ model Question {
   @@map("questions")
 }
 
-model Exam {
-  id           Int       @id @default(autoincrement())
-  examName     String    @map("exam_name")
-  description  String?   @db.Text
-  subjectId    Int       @map("subject_id")
-  gradeLevel   String?   @map("grade_level")
-  duration     Int
-  totalMarks   Int?      @map("total_marks")
-  passingMarks Int?      @map("passing_marks")
-  scheduleTime DateTime? @map("schedule_time")
-  isActive     Boolean   @default(false) @map("is_active")
-  retakeAllowed Boolean  @default(false) @map("retake_allowed")
-  createdBy    Int       @map("created_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+// ─── Exams ────────────────────────────────────────────────────────────────────
 
-  subject      Subject       @relation(fields: [subjectId], references: [id])
-  creator      User          @relation("TeacherExams", fields: [createdBy], references: [id])
+model Exam {
+  id            Int       @id @default(autoincrement())
+  examName      String    @map("exam_name")
+  description   String?   @db.Text
+  subjectId     Int       @map("subject_id")
+  gradeLevel    String?   @map("grade_level")
+  duration      Int
+  totalMarks    Int?      @map("total_marks")
+  passingMarks  Int?      @map("passing_marks")
+  scheduleTime  DateTime? @map("schedule_time")
+  isActive      Boolean   @default(false) @map("is_active")
+  retakeAllowed Boolean   @default(false) @map("retake_allowed")
+  createdBy     Int       @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  subject       Subject       @relation(fields: [subjectId], references: [id])
+  creator       User          @relation("TeacherExams", fields: [createdBy], references: [id])
   examQuestions ExamQuestion[]
   examAttempts  ExamAttempt[]
 
@@ -220,19 +227,32 @@ model ExamQuestion {
   @@map("exam_questions")
 }
 
+// ─── Attempts & Results ───────────────────────────────────────────────────────
+
 model ExamAttempt {
   id          Int       @id @default(autoincrement())
   examId      Int       @map("exam_id")
-  studentId   Int       @map("student_id")
+
+  // Registered student (nullable — null means guest)
+  studentId   Int?      @map("student_id")
+
+  // Guest info — only set when studentId is null
+  guestName   String?   @map("guest_name")
+  guestCollege String?  @map("guest_college")
+  // Token used to prevent duplicate guest submissions (stored in their localStorage)
+  guestToken  String?   @unique @map("guest_token")
+
   score       Float?    @default(0)
   startedAt   DateTime  @default(now()) @map("started_at")
   submittedAt DateTime? @map("submitted_at")
   isCompleted Boolean   @default(false) @map("is_completed")
 
-  exam    Exam       @relation(fields: [examId], references: [id])
-  student User       @relation(fields: [studentId], references: [id])
+  exam    Exam         @relation(fields: [examId], references: [id])
+  student User?        @relation(fields: [studentId], references: [id])
   answers ExamAnswer[]
 
+  // A registered student can only have one completed attempt per exam (unless retake allowed — enforced in app logic)
+  // Guests are deduplicated via guestToken (unique constraint above)
   @@map("exam_attempts")
 }
 

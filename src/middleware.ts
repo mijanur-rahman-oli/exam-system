@@ -6,26 +6,16 @@ export default withAuth(
     const token = req.nextauth.token;
     const { pathname } = req.nextUrl;
 
-    if (!token) {
+    if (pathname.startsWith("/admin") && token?.role !== "admin") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
-
-    const role = token.role as string;
-
-    // Protect role-specific routes
-    if (pathname.startsWith("/admin") && role !== "admin") {
+    if (pathname.startsWith("/teacher") && token?.role !== "teacher") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
-
-    if (pathname.startsWith("/teacher") && role !== "teacher") {
+    if (pathname.startsWith("/student") && token?.role !== "student") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
-
-    if (pathname.startsWith("/student") && role !== "student") {
-      return NextResponse.redirect(new URL("/login", req.url));
-    }
-
-    if (pathname.startsWith("/question-setter") && role !== "question_setter") {
+    if (pathname.startsWith("/question-setter") && token?.role !== "question_setter") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
@@ -33,6 +23,8 @@ export default withAuth(
   },
   {
     callbacks: {
+      // /exam/* is intentionally NOT in the matcher below, so it's always public.
+      // withAuth's authorized callback only runs for matched paths.
       authorized: ({ token }) => !!token,
     },
   }
@@ -40,10 +32,11 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
     "/admin/:path*",
     "/teacher/:path*",
     "/student/:path*",
     "/question-setter/:path*",
+    "/dashboard/:path*",
+    // NOTE: /exam/:path* is deliberately excluded — public access for exam links
   ],
 };
