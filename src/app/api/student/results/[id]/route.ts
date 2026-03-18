@@ -3,37 +3,64 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: Request) {
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user || session.user.role !== "student") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") ?? "10");
-
-    const attempts = await prisma.examAttempt.findMany({
-      where: { studentId: parseInt(session.user.id), isCompleted: true },
-      include: {
-        exam: { select: { examName: true, totalMarks: true } },
+    const attempt = await prisma.examAttempt.findFirst({
+      where: {
+        id: parseInt(params.id),
+        studentId: parseInt(session.user.id),
+        isCompleted: true,
       },
-      orderBy: { submittedAt: "desc" },
-      take: limit,
+      include: {
+        exam: {
+          select: {
+            examName: true,
+            totalMarks: true,
+            passingMarks: true,
+            duration: true,
+          },
+        },
+        answers: {
+          include: {
+            question: {
+              select: {
+                question: true,
+                optionA: true,
+                optionB: true,
+                optionC: true,
+                optionD: true,
+                correctAnswer: true,
+                explanation: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    const results = attempts.map((a) => ({
-      id: a.id,
-      examName: a.exam.examName,
-      score: a.exam.totalMarks && a.exam.totalMarks > 0
-        ? Math.round(((a.score ?? 0) / a.exam.totalMarks) * 100)
-        : a.score ?? 0,
-      submittedAt: a.submittedAt,
-    }));
+    if (!attempt) {
+      return NextResponse.json({ error: "Result not found" }, { status: 404 });
+    }
 
-    return NextResponse.json(results);
+    return NextResponse.json({
+      id: attempt.id,
+      exam: attempt.exam,
+      score: attempt.score,
+      totalMarks: attempt.exam.totalMarks,
+      passingMarks: attempt.exam.passingMarks,
+      submittedAt: attempt.submittedAt,
+      answers: attempt.answers,
+    });
   } catch (error) {
-    console.error("Recent results error:", error);
+    console.error("Get result error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

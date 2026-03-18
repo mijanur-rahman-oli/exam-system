@@ -9,12 +9,17 @@ export async function GET() {
     if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const exams = await prisma.exam.findMany({
-      include: { subject: true, creator: { select: { username: true } } },
+      include: {
+        subject: true,
+        creator: { select: { username: true } },
+        examQuestions: { select: { id: true, marks: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(exams);
   } catch (error) {
+    console.error("Get exams error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -51,12 +56,16 @@ export async function POST(req: Request) {
         retakeAllowed: retakeAllowed ?? false,
         isActive: isActive ?? false,
         createdBy: parseInt(session.user.id),
-        examQuestions: Array.isArray(questions) ? {
+        examQuestions: Array.isArray(questions) && questions.length > 0 ? {
           create: questions.map((q: any) => ({
             questionId: q.questionId,
             marks: q.marks || 1,
           })),
         } : undefined,
+      },
+      include: {
+        subject: true,
+        examQuestions: { select: { id: true, marks: true } },
       },
     });
 

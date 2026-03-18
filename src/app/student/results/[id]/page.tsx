@@ -6,10 +6,11 @@ import { CheckCircle, XCircle, ArrowLeft, Trophy, Target, Clock } from "lucide-r
 
 export default function ResultDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router  = useRouter();
+  const router = useRouter();
 
   const { data: result, isLoading } = useQuery({
     queryKey: ["result", id],
+    staleTime: 0,
     queryFn: async () => {
       const res = await fetch(`/api/student/results/${id}`);
       if (!res.ok) throw new Error("Failed to fetch result");
@@ -41,12 +42,12 @@ export default function ResultDetailPage() {
   }
 
   const totalMarks = result.totalMarks ?? result.answers?.length ?? 0;
-  const score      = result.score ?? 0;
-  const pct        = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
-  const passed     = result.passingMarks ? score >= result.passingMarks : pct >= 50;
-  const correctCt  = result.answers?.filter((a: any) => a.isCorrect).length ?? 0;
-  const pctColor   = pct >= 75 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)";
-  const pctBg      = pct >= 75 ? "var(--green-bg)" : pct >= 50 ? "var(--amber-bg)" : "var(--red-bg)";
+  const score = result.score ?? 0;
+  const pct = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
+  const passed = result.passingMarks ? score >= result.passingMarks : pct >= 50;
+  const correctCt = result.answers?.filter((a: any) => a.isCorrect).length ?? 0;
+  const pctColor = pct >= 75 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)";
+  const pctBg = pct >= 75 ? "var(--green-bg)" : pct >= 50 ? "var(--amber-bg)" : "var(--red-bg)";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
@@ -83,9 +84,9 @@ export default function ResultDetailPage() {
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem", marginTop: "1.25rem" }}>
           {[
-            { Icon: Trophy,  label: "Score",   value: `${score} / ${totalMarks}`,           color: "var(--accent)", bg: "var(--accent-bg)" },
-            { Icon: Target,  label: "Correct", value: `${correctCt} / ${result.answers?.length ?? 0}`, color: "var(--green)",  bg: "var(--green-bg)"  },
-            { Icon: Clock,   label: "Status",  value: passed ? "Passed" : "Failed",          color: passed ? "var(--green)" : "var(--red)", bg: passed ? "var(--green-bg)" : "var(--red-bg)" },
+            { Icon: Trophy, label: "Score", value: `${score} / ${totalMarks}`, color: "var(--accent)", bg: "var(--accent-bg)" },
+            { Icon: Target, label: "Correct", value: `${correctCt} / ${result.answers?.length ?? 0}`, color: "var(--green)", bg: "var(--green-bg)" },
+            { Icon: Clock, label: "Status", value: passed ? "Passed" : "Failed", color: passed ? "var(--green)" : "var(--red)", bg: passed ? "var(--green-bg)" : "var(--red-bg)" },
           ].map(({ Icon, label, value, color, bg }) => (
             <div key={label} style={{ background: bg, borderRadius: "0.5rem", padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <Icon size={16} color={color} />
@@ -131,8 +132,8 @@ export default function ResultDetailPage() {
                       {ans.isCorrect
                         ? <CheckCircle size={18} color="var(--green)" />
                         : ans.selectedAnswer
-                        ? <XCircle size={18} color="var(--red)" />
-                        : <span style={{ fontSize: "0.65rem", background: "var(--amber-bg)", color: "var(--amber)", padding: "0.2rem 0.4rem", borderRadius: "0.3rem", fontWeight: 700 }}>SKIPPED</span>}
+                          ? <XCircle size={18} color="var(--red)" />
+                          : <span style={{ fontSize: "0.65rem", background: "var(--amber-bg)", color: "var(--amber)", padding: "0.2rem 0.4rem", borderRadius: "0.3rem", fontWeight: 700 }}>SKIPPED</span>}
                     </div>
                   </div>
 
@@ -140,14 +141,14 @@ export default function ResultDetailPage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
                     {opts.map((opt) => {
                       const isCorrectOpt = ans.question?.correctAnswer?.split(",").includes(opt.key);
-                      const isSelected   = ans.selectedAnswer?.split(",").includes(opt.key);
+                      const isSelected = ans.selectedAnswer?.split(",").includes(opt.key);
 
-                      let bg     = "var(--surface2)";
+                      let bg = "var(--surface2)";
                       let border = "var(--border)";
-                      let color  = "var(--text2)";
+                      let color = "var(--text2)";
 
-                      if (isCorrectOpt)               { bg = "var(--green-bg)"; border = "var(--green)"; color = "var(--green)"; }
-                      if (isSelected && !isCorrectOpt) { bg = "var(--red-bg)";   border = "var(--red)";   color = "var(--red)";   }
+                      if (isCorrectOpt) { bg = "var(--green-bg)"; border = "var(--green)"; color = "var(--green)"; }
+                      if (isSelected && !isCorrectOpt) { bg = "var(--red-bg)"; border = "var(--red)"; color = "var(--red)"; }
 
                       return (
                         <div key={opt.key} style={{
