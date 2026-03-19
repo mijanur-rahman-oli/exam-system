@@ -1,4 +1,3 @@
-// app/api/questions/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -23,33 +22,26 @@ export async function GET(req: NextRequest) {
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined;
     const createdByMe = searchParams.get("createdByMe") === "true";
 
-    // Build where clause
     const where: any = {};
 
     if (createdByMe) {
       where.createdBy = parseInt(session.user.id);
     }
-
     if (subjectId && subjectId !== "all") {
       where.subjectId = parseInt(subjectId);
     }
-
     if (chapterId && chapterId !== "all") {
       where.chapterId = parseInt(chapterId);
     }
-
     if (subconceptId && subconceptId !== "all") {
       where.subconceptId = parseInt(subconceptId);
     }
-
     if (gradeLevel && gradeLevel !== "all") {
       where.gradeLevel = gradeLevel;
     }
-
     if (difficulty && difficulty !== "all") {
       where.difficulty = difficulty;
     }
-
     if (search) {
       where.question = {
         contains: search,
@@ -120,7 +112,7 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join(",");
 
-    // Create uploads directory if it doesn't exist
+    // Directory Setup
     const uploadsDir = path.join(process.cwd(), "public", "uploads", "question-images");
     await mkdir(uploadsDir, { recursive: true });
 
@@ -132,25 +124,31 @@ export async function POST(req: NextRequest) {
       return `/uploads/question-images/${name}`;
     };
 
+    // 1. Process Main Question Image
     const questionImageFile = formData.get("questionImage");
     const questionImage = questionImageFile instanceof File ? await saveImage(questionImageFile) : null;
 
+    // 2. Process Solution Image (New Update)
     const solutionImageFile = formData.get("solutionImage");
-    const solutionImagePath = solutionImageFile instanceof File ? await saveImage(solutionImageFile) : null;
-
-    let explanation: string | null = null;
-    if (solutionType === "text" && solutionText) {
-      explanation = solutionText;
-    } else if (solutionType === "image" && solutionImagePath) {
-      explanation = solutionImagePath;
+    let solutionImage: string | null = null;
+    if (solutionImageFile instanceof File && solutionImageFile.size > 0) {
+      solutionImage = await saveImage(solutionImageFile);
     }
 
+    // 3. Process Explanation Text
+    let explanation: string | null = null;
+    if (solutionType === "text" || solutionType === "image") {
+       explanation = solutionText; // Keep text regardless if user provided it
+    }
+
+    // 4. Process Option Images
     const optionImages: (string | null)[] = [null, null, null, null];
     for (let i = 0; i < 4; i++) {
       const img = formData.get(`optionImage_${i}`);
-      if (img instanceof File) optionImages[i] = await saveImage(img);
+      if (img instanceof File && img.size > 0) optionImages[i] = await saveImage(img);
     }
 
+    // 5. Create in Database
     const created = await prisma.question.create({
       data: {
         subjectId: parseInt(subjectId),
@@ -159,6 +157,7 @@ export async function POST(req: NextRequest) {
         gradeLevel: gradeLevel || null,
         question,
         questionImage,
+        solutionImage, // ← Added field
         optionA: options[0]?.text ?? "",
         optionB: options[1]?.text ?? "",
         optionC: options[2]?.text ?? null,

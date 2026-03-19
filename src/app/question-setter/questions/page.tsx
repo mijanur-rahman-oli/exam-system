@@ -84,14 +84,14 @@ export default function AdminQuestionsPage() {
   };
 
   return (
- <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+  <div className="p-8 flex flex-col gap-6">
       {/* KaTeX CSS */}
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div>
-          <h1 style={{ fontSize: "0.65rem", fontWeight: 700, margin: 0, color: "var(--text)" }}>Question Bank</h1>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 800, margin: 0, color: "var(--text)" }}>Question Bank</h1>
           <p style={{ fontSize: "0.85rem", color: "var(--text2)", marginTop: "0.25rem" }}>Manage and organize all questions</p>
         </div>
         <Link href="/question-setter/questions/create">
@@ -196,19 +196,25 @@ export default function AdminQuestionsPage() {
                 <div style={{ padding: "1rem 1.25rem", borderTop: "1px solid var(--border)", background: "var(--surface2)" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
                     <div>
+                      {q.questionImage && (
+                        <img src={q.questionImage} alt="question" style={{ maxHeight: "180px", maxWidth: "100%", objectFit: "contain", borderRadius: "0.5rem", border: "1px solid var(--border)", marginBottom: "0.75rem", display: "block" }} />
+                      )}
                       <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text3)", marginBottom: "0.5rem", textTransform: "uppercase" }}>Options</p>
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
                         {[
-                          { letter: "A", text: q.optionA },
-                          { letter: "B", text: q.optionB },
-                          { letter: "C", text: q.optionC },
-                          { letter: "D", text: q.optionD },
+                          { letter: "A", text: q.optionA, img: q.optionAImage },
+                          { letter: "B", text: q.optionB, img: q.optionBImage },
+                          { letter: "C", text: q.optionC, img: q.optionCImage },
+                          { letter: "D", text: q.optionD, img: q.optionDImage },
                         ].filter(o => o.text).map(opt => {
                           const isCorrect = q.correctAnswer?.split(",").includes(opt.letter);
                           return (
-                            <div key={opt.letter} style={{ padding: "0.5rem 0.75rem", borderRadius: "0.4rem", background: isCorrect ? "var(--green-bg)" : "var(--surface)", border: `1px solid ${isCorrect ? "var(--green)" : "var(--border)"}`, display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                              <span style={{ width: "1.25rem", height: "1.25rem", borderRadius: "50%", background: isCorrect ? "var(--green)" : "var(--surface2)", color: isCorrect ? "#fff" : "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, flexShrink: 0 }}>{opt.letter}</span>
-                              <KaTeXDisplay text={opt.text} inline />
+                            <div key={opt.letter} style={{ padding: "0.5rem 0.75rem", borderRadius: "0.4rem", background: isCorrect ? "var(--green-bg)" : "var(--surface)", border: `1px solid ${isCorrect ? "var(--green)" : "var(--border)"}`, display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+                              <span style={{ width: "1.25rem", height: "1.25rem", borderRadius: "50%", background: isCorrect ? "var(--green)" : "var(--surface2)", color: isCorrect ? "#fff" : "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, flexShrink: 0, marginTop: "0.1rem" }}>{opt.letter}</span>
+                              <div>
+                                <KaTeXDisplay text={opt.text} inline />
+                                {opt.img && <img src={opt.img} alt="" style={{ marginTop: "0.4rem", maxHeight: "120px", maxWidth: "100%", objectFit: "contain", borderRadius: "0.375rem", display: "block" }} />}
+                              </div>
                             </div>
                           );
                         })}

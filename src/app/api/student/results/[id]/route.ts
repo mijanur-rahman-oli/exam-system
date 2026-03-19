@@ -22,6 +22,7 @@ export async function GET(
       include: {
         exam: {
           select: {
+            id: true,
             examName: true,
             totalMarks: true,
             passingMarks: true,
@@ -33,12 +34,18 @@ export async function GET(
             question: {
               select: {
                 question: true,
+                questionImage: true,
                 optionA: true,
                 optionB: true,
                 optionC: true,
                 optionD: true,
+                optionAImage: true,
+                optionBImage: true,
+                optionCImage: true,
+                optionDImage: true,
                 correctAnswer: true,
                 explanation: true,
+                solutionImage: true,
               },
             },
           },

@@ -389,43 +389,6 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Recent Activity Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {recentItems.map((section, index) => (
-          <div key={index} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-            {/* Header */}
-            <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <section.icon size={18} className="text-[var(--accent)]" />
-                <h3 className="font-medium text-[var(--text)]">{section.title}</h3>
-              </div>
-              <Link 
-                href={section.viewAll}
-                className="text-xs text-[var(--accent)] hover:underline"
-              >
-                View all
-              </Link>
-            </div>
-
-            {/* Content */}
-            <div className="divide-y divide-[var(--border)]">
-              {section.data.length > 0 ? (
-                section.data.map((item: any, idx: number) => (
-                  <div key={idx} className="p-4 hover:bg-[var(--surface2)] transition-colors">
-                    {section.renderItem(item)}
-                  </div>
-                ))
-              ) : (
-                <div className="p-8 text-center">
-                  <section.icon size={24} className="mx-auto mb-2 text-[var(--text3)]" />
-                  <p className="text-sm text-[var(--text2)]">{section.emptyMessage}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Quick Tips */}
       <div className="p-4 rounded-xl bg-[var(--surface2)] border border-[var(--border)]">
         <div className="flex items-start gap-3">

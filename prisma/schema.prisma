@@ -170,6 +170,7 @@ model Question {
   correctAnswer    String  @map("correct_answer")
   isMultipleAnswer Boolean @default(false) @map("is_multiple_answer")
   explanation      String? @db.Text
+  solutionImage    String? @map("solution_image")
 
   marks      Int        @default(1)
   difficulty Difficulty @default(medium)

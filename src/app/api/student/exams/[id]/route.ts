@@ -20,8 +20,18 @@ export async function GET(
           include: {
             question: {
               select: {
-                id: true, question: true,
-                optionA: true, optionB: true, optionC: true, optionD: true,
+                id: true,
+                question: true,
+                questionImage: true,
+                optionA: true,
+                optionB: true,
+                optionC: true,
+                optionD: true,
+                optionAImage: true,
+                optionBImage: true,
+                optionCImage: true,
+                optionDImage: true,
+                isMultipleAnswer: true,
                 marks: true,
               },
             },

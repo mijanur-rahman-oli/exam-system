@@ -120,7 +120,6 @@ export default function TakeExamPage() {
   const answered  = Object.keys(answers).length;
   const isLowTime = timeLeft !== null && timeLeft < 120;
 
-  // ── Loading ────────────────────────────────────────────────────────────────
   if (examLoading || startMutation.isPending || !examStarted || !exam) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: "1rem" }}>
@@ -133,7 +132,6 @@ export default function TakeExamPage() {
     );
   }
 
-  // ── Error ──────────────────────────────────────────────────────────────────
   if (startError) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
@@ -163,7 +161,6 @@ export default function TakeExamPage() {
     );
   }
 
-  // ── Exam UI ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0", margin: "-2rem" }}>
 
@@ -210,11 +207,11 @@ export default function TakeExamPage() {
           const qId      = q.id;
           const selected = answers[qId];
           const opts     = [
-            { key: "A", text: q.optionA },
-            { key: "B", text: q.optionB },
-            { key: "C", text: q.optionC },
-            { key: "D", text: q.optionD },
-          ].filter((o) => o.text);
+            { key: "A", text: q.optionA, img: q.optionAImage },
+            { key: "B", text: q.optionB, img: q.optionBImage },
+            { key: "C", text: q.optionC, img: q.optionCImage },
+            { key: "D", text: q.optionD, img: q.optionDImage },
+          ].filter((o) => o.text || o.img);
 
           return (
             <div
@@ -226,11 +223,20 @@ export default function TakeExamPage() {
                 boxShadow: "var(--shadow)", transition: "border-color 0.2s",
               }}
             >
-              {/* Question text */}
+              {/* Question text + image */}
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
-                <div style={{ fontSize: "0.95rem", lineHeight: 1.7, color: "var(--text)", flex: 1 }}>
-                  <span style={{ fontWeight: 800, color: "var(--accent)", marginRight: "0.5rem" }}>Q{idx + 1}.</span>
-                  <KaTeXDisplay text={q.question} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "0.95rem", lineHeight: 1.7, color: "var(--text)" }}>
+                    <span style={{ fontWeight: 800, color: "var(--accent)", marginRight: "0.5rem" }}>Q{idx + 1}.</span>
+                    <KaTeXDisplay text={q.question} />
+                  </div>
+                  {q.questionImage && (
+                    <img
+                      src={q.questionImage}
+                      alt="question"
+                      style={{ marginTop: "0.75rem", maxHeight: "240px", maxWidth: "100%", objectFit: "contain", borderRadius: "0.5rem", border: "1px solid var(--border)", display: "block" }}
+                    />
+                  )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
                   {selected && <CheckCircle size={16} color="var(--green)" />}
@@ -253,7 +259,7 @@ export default function TakeExamPage() {
                         borderRadius: "0.5rem", cursor: "pointer", transition: "all 0.12s",
                         border: `2px solid ${isSelected ? "var(--accent)" : "var(--border)"}`,
                         background: isSelected ? "var(--accent-bg)" : "var(--surface)",
-                        display: "flex", alignItems: "center", gap: "0.75rem",
+                        display: "flex", alignItems: "flex-start", gap: "0.75rem",
                         fontSize: "0.87rem", color: "var(--text)", width: "100%",
                       }}
                     >
@@ -264,11 +270,20 @@ export default function TakeExamPage() {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "0.72rem", fontWeight: 800,
                         color: isSelected ? "#fff" : "var(--text3)",
-                        transition: "all 0.12s",
+                        transition: "all 0.12s", marginTop: "0.1rem",
                       }}>
                         {opt.key}
                       </div>
-                      <KaTeXDisplay text={opt.text} />
+                      <div style={{ flex: 1 }}>
+                        <KaTeXDisplay text={opt.text} />
+                        {opt.img && (
+                          <img
+                            src={opt.img}
+                            alt={`option ${opt.key}`}
+                            style={{ marginTop: "0.5rem", maxHeight: "160px", maxWidth: "100%", objectFit: "contain", borderRadius: "0.375rem", border: "1px solid var(--border)", display: "block" }}
+                          />
+                        )}
+                      </div>
                     </button>
                   );
                 })}
