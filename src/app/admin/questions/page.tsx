@@ -1,41 +1,47 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
-import { 
-  Plus, Pencil, Trash2, Search, Filter, 
-  Eye, ChevronDown, ChevronUp, Copy, FileQuestion,
-  BookOpen, Layers, Clock, CheckCircle, XCircle
-} from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ChevronDown, ChevronUp, FileQuestion, Layers, Clock, CheckCircle, XCircle } from "lucide-react";
+
+// ─── KaTeX renderer ───────────────────────────────────────────────────────────
+function KaTeXDisplay({ text, inline = false }: { text: string; inline?: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!ref.current || !text) return;
+    import("katex").then((katex) => {
+      let html = text
+        .replace(/\$\$(.+?)\$\$/gs, (_, expr) => {
+          try { return katex.default.renderToString(expr, { displayMode: true, throwOnError: false }); } catch { return _; }
+        })
+        .replace(/\$(.+?)\$/g, (_, expr) => {
+          try { return katex.default.renderToString(expr, { displayMode: false, throwOnError: false }); } catch { return _; }
+        });
+      if (ref.current) ref.current.innerHTML = html;
+    });
+  }, [text]);
+  return <span ref={ref} style={{ fontSize: inline ? "0.85rem" : "1rem", lineHeight: 1.6, color: "var(--text)" }} />;
+}
 
 export default function AdminQuestionsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [filters, setFilters] = useState({
-    subjectId: "all",
-    chapterId: "all",
-    difficulty: "all",
-  });
+  const [filters, setFilters] = useState({ subjectId: "all", chapterId: "all", difficulty: "all" });
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  // Debounce search to prevent excessive API calls
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data: subjects } = useQuery({
-    queryKey: ["subjects"],
-    queryFn: () => fetch("/api/subjects").then(r => r.json()),
-  });
-
+  const { data: subjects } = useQuery({ queryKey: ["subjects"], queryFn: () => fetch("/api/subjects").then(r => r.json()) });
   const { data: chapters } = useQuery({
     queryKey: ["chapters", filters.subjectId],
     queryFn: () => fetch(`/api/chapters?subjectId=${filters.subjectId}`).then(r => r.json()),
-    enabled: filters.subjectId !== "all" && !!filters.subjectId,
+    enabled: filters.subjectId !== "all",
   });
 
   const { data: questions, refetch, isLoading } = useQuery({
@@ -46,7 +52,6 @@ export default function AdminQuestionsPage() {
       if (filters.chapterId !== "all") params.append("chapterId", filters.chapterId);
       if (filters.difficulty !== "all") params.append("difficulty", filters.difficulty);
       if (debouncedSearch) params.append("search", debouncedSearch);
-      
       const res = await fetch(`/api/questions?${params}`);
       if (!res.ok) throw new Error("Failed to fetch questions");
       return res.json();
@@ -59,175 +64,169 @@ export default function AdminQuestionsPage() {
       if (!res.ok) throw new Error("Failed to delete");
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Question deleted successfully" });
-      refetch();
-    },
+    onSuccess: () => { toast({ title: "Question deleted" }); refetch(); },
     onError: () => toast({ title: "Error", description: "Failed to delete", variant: "destructive" }),
   });
 
-  const difficultyColors: Record<string, string> = {
-    easy: "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20",
-    medium: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20",
-    hard: "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20",
+  const diffColors: Record<string, { bg: string; color: string }> = {
+    easy:   { bg: "var(--green-bg)", color: "var(--green)" },
+    medium: { bg: "var(--amber-bg)", color: "var(--amber)" },
+    hard:   { bg: "var(--red-bg)",   color: "var(--red)"   },
   };
 
   const stats = {
-    total: questions?.length || 0,
-    easy: questions?.filter((q: any) => q.difficulty === "easy").length || 0,
-    medium: questions?.filter((q: any) => q.difficulty === "medium").length || 0,
-    hard: questions?.filter((q: any) => q.difficulty === "hard").length || 0,
-    subjects: new Set(questions?.map((q: any) => q.subject?.name)).size || 0,
+    total:    questions?.length || 0,
+    easy:     questions?.filter((q: any) => q.difficulty === "easy").length   || 0,
+    medium:   questions?.filter((q: any) => q.difficulty === "medium").length || 0,
+    hard:     questions?.filter((q: any) => q.difficulty === "hard").length   || 0,
+    subjects: new Set(questions?.map((q: any) => q.subject?.name)).size       || 0,
   };
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-8 flex flex-col gap-6">
+      {/* KaTeX CSS */}
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div>
-          <h1 className="text-3xl font-bold text-[var(--text)]">Question Bank</h1>
-          <p className="text-[var(--text2)] mt-2 text-lg">Manage and organize all questions</p>
+          <h1 style={{ fontSize: "1.85rem", fontWeight: 700, margin: 0, color: "var(--text)" }}>Question Bank</h1>
+          <p style={{ fontSize: "0.90rem", color: "var(--text2)", marginTop: "0.15rem" }}>Manage and organize all questions</p>
         </div>
         <Link href="/admin/questions/create">
-          <button className="px-6 py-3 bg-[var(--accent)] text-white rounded-xl hover:bg-[var(--accent-dim)] transition-all flex items-center gap-2">
-            <Plus size={20} /> Create New Question
+          <button style={{ padding: "0.6rem 1.2rem", borderRadius: "0.5rem", background: "var(--accent)", border: "none", color: "#fff", fontSize: "0.85rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Plus size={16} /> Create Question
           </button>
         </Link>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "0.875rem" }}>
         {[
-          { label: "Total", val: stats.total, icon: FileQuestion, color: "blue" },
-          { label: "Easy", val: stats.easy, icon: CheckCircle, color: "green" },
-          { label: "Medium", val: stats.medium, icon: Clock, color: "yellow" },
-          { label: "Hard", val: stats.hard, icon: XCircle, color: "red" },
-          { label: "Subjects", val: stats.subjects, icon: Layers, color: "purple" }
-        ].map((stat) => (
-          <div key={stat.label} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            <div className="flex items-center gap-3 mb-2">
-              <div className={`w-8 h-8 rounded-lg bg-${stat.color}-500/10 flex items-center justify-center`}>
-                <stat.icon size={16} className={`text-${stat.color}-600`} />
+          { label: "Total",    val: stats.total,    Icon: FileQuestion, color: "var(--accent)", bg: "var(--accent-bg)" },
+          { label: "Easy",     val: stats.easy,     Icon: CheckCircle,  color: "var(--green)",  bg: "var(--green-bg)"  },
+          { label: "Medium",   val: stats.medium,   Icon: Clock,        color: "var(--amber)",  bg: "var(--amber-bg)"  },
+          { label: "Hard",     val: stats.hard,     Icon: XCircle,      color: "var(--red)",    bg: "var(--red-bg)"    },
+          { label: "Subjects", val: stats.subjects, Icon: Layers,       color: "var(--accent)", bg: "var(--accent-bg)" },
+        ].map(({ label, val, Icon, color, bg }) => (
+          <div key={label} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1rem 1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+              <div style={{ width: "1.75rem", height: "1.75rem", borderRadius: "0.4rem", background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon size={13} color={color} />
               </div>
-              <span className="text-xs text-[var(--text2)]">{stat.label}</span>
+              <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text3)", textTransform: "uppercase" }}>{label}</span>
             </div>
-            <p className="text-2xl font-bold text-[var(--text)]">{stat.val}</p>
+            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text)" }}>{val}</div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text3)]" />
-            <input
-              type="text"
-              placeholder="Search questions..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--input-bg)]"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          
-          <select
-            value={filters.subjectId}
-            onChange={(e) => setFilters({ ...filters, subjectId: e.target.value, chapterId: "all" })}
-            className="px-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--input-bg)]"
-          >
-            <option value="all">All Subjects</option>
-            {subjects?.map((s: any) => <option key={s.id} value={s.id.toString()}>{s.name}</option>)}
-          </select>
-
-          <select
-            value={filters.chapterId}
-            onChange={(e) => setFilters({ ...filters, chapterId: e.target.value })}
-            disabled={filters.subjectId === "all"}
-            className="px-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--input-bg)] disabled:opacity-50"
-          >
-            <option value="all">All Chapters</option>
-            {chapters?.map((c: any) => <option key={c.id} value={c.id.toString()}>{c.name}</option>)}
-          </select>
-
-          <select
-            value={filters.difficulty}
-            onChange={(e) => setFilters({ ...filters, difficulty: e.target.value })}
-            className="px-4 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--input-bg)]"
-          >
-            <option value="all">All Difficulties</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "1rem", display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, position: "relative", minWidth: "200px" }}>
+          <Search size={13} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "var(--text3)" }} />
+          <input type="text" placeholder="Search questions..." value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "100%", height: "2.25rem", paddingLeft: "2.1rem", paddingRight: "0.875rem", borderRadius: "0.5rem", border: "1.5px solid var(--border)", background: "var(--input-bg)", color: "var(--text)", fontSize: "0.82rem", outline: "none", boxSizing: "border-box" }} />
         </div>
+        {[
+          { key: "subjectId", label: "All Subjects", options: subjects?.map((s: any) => ({ val: String(s.id), label: s.name })) || [] },
+          { key: "chapterId", label: "All Chapters", options: chapters?.map((c: any) => ({ val: String(c.id), label: c.name })) || [], disabled: filters.subjectId === "all" },
+          { key: "difficulty", label: "All Difficulties", options: ["easy","medium","hard"].map(d => ({ val: d, label: d.charAt(0).toUpperCase()+d.slice(1) })) },
+        ].map(({ key, label, options, disabled }) => (
+          <select key={key} value={(filters as any)[key]} disabled={disabled}
+            onChange={(e) => setFilters(f => ({ ...f, [key]: e.target.value, ...(key === "subjectId" ? { chapterId: "all" } : {}) }))}
+            style={{ height: "2.25rem", padding: "0 0.875rem", borderRadius: "0.5rem", border: "1.5px solid var(--border)", background: "var(--input-bg)", color: "var(--text)", fontSize: "0.82rem", outline: "none", opacity: disabled ? 0.5 : 1 }}>
+            <option value="all">{label}</option>
+            {options.map((o: any) => <option key={o.val} value={o.val}>{o.label}</option>)}
+          </select>
+        ))}
       </div>
 
-      {/* Questions List */}
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+      {/* Questions list */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
         {isLoading ? (
-          <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div></div>
-        ) : (
-          <div className="divide-y divide-[var(--border)]">
-            {questions?.map((q: any) => (
-              <div key={q.id} className="hover:bg-[var(--surface2)] transition-colors">
-                <div className="p-6 flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${difficultyColors[q.difficulty]}`}>{q.difficulty}</span>
-                      <span className="text-xs text-[var(--text2)]">ID: {q.id} • {q.marks} Marks</span>
-                    </div>
-                    <p className="text-lg font-medium text-[var(--text)]">{q.question}</p>
+          <div style={{ padding: "3rem", textAlign: "center" }}>
+            <div style={{ width: "2rem", height: "2rem", border: "3px solid var(--border)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
+          </div>
+        ) : !questions?.length ? (
+          <div style={{ padding: "3rem", textAlign: "center", color: "var(--text3)", fontSize: "0.85rem" }}>
+            No questions found.{" "}
+            <Link href="/admin/questions/create" style={{ color: "var(--accent)" }}>Create the first one</Link>
+          </div>
+        ) : questions.map((q: any, i: number) => {
+          const dc = diffColors[q.difficulty] ?? diffColors.medium;
+          const expanded = expandedId === q.id;
+          return (
+            <div key={q.id} style={{ borderBottom: i < questions.length - 1 ? "1px solid var(--border)" : "none" }}>
+              <div style={{ padding: "1rem 1.25rem", display: "flex", alignItems: "flex-start", gap: "0.875rem", transition: "background 0.12s" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface2)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.4rem", flexWrap: "wrap" }}>
+                    <span style={{ padding: "0.18rem 0.5rem", borderRadius: "999px", fontSize: "0.65rem", fontWeight: 700, background: dc.bg, color: dc.color }}>{q.difficulty}</span>
+                    <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>#{q.id} · {q.marks} mark{q.marks !== 1 ? "s" : ""}</span>
+                    {q.subject?.name && <span style={{ fontSize: "0.65rem", color: "var(--text3)" }}>· {q.subject.name}</span>}
                   </div>
+                  {/* ✅ KaTeX renders math in question text */}
+                  <KaTeXDisplay text={q.question} />
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+                  <button onClick={() => setExpandedId(expanded ? null : q.id)}
+                    style={{ padding: "0.35rem", borderRadius: "0.375rem", border: "1px solid var(--border)", background: "none", color: "var(--text2)", cursor: "pointer" }}>
+                    {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                  <Link href={`/admin/questions/${q.id}/edit`}>
+                    <button style={{ padding: "0.35rem", borderRadius: "0.375rem", border: "1px solid var(--border)", background: "none", color: "var(--text2)", cursor: "pointer" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--accent-bg)"; e.currentTarget.style.color = "var(--accent)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text2)"; }}>
+                      <Pencil size={14} />
+                    </button>
+                  </Link>
+                  <button onClick={() => confirm("Delete this question?") && deleteMutation.mutate(q.id)}
+                    style={{ padding: "0.35rem", borderRadius: "0.375rem", border: "1px solid var(--border)", background: "none", color: "var(--text2)", cursor: "pointer" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--red-bg)"; e.currentTarget.style.color = "var(--red)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text2)"; }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
 
-                  <div className="flex items-center gap-2 ml-4">
-                    <button onClick={() => setExpandedId(expandedId === q.id ? null : q.id)} className="p-2 hover:bg-[var(--accent-bg)] rounded-lg">
-                      {expandedId === q.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    </button>
-                    <Link href={`/admin/questions/${q.id}/edit`} className="p-2 hover:bg-[var(--accent-bg)] rounded-lg"><Pencil size={18} /></Link>
-                    <button onClick={() => confirm("Delete?") && deleteMutation.mutate(q.id)} className="p-2 hover:bg-red-500/10 text-red-500 rounded-lg">
-                      <Trash2 size={18} />
-                    </button>
+              {expanded && (
+                <div style={{ padding: "1rem 1.25rem", borderTop: "1px solid var(--border)", background: "var(--surface2)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+                    <div>
+                      <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text3)", marginBottom: "0.5rem", textTransform: "uppercase" }}>Options</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+                        {[
+                          { letter: "A", text: q.optionA },
+                          { letter: "B", text: q.optionB },
+                          { letter: "C", text: q.optionC },
+                          { letter: "D", text: q.optionD },
+                        ].filter(o => o.text).map(opt => {
+                          const isCorrect = q.correctAnswer?.split(",").includes(opt.letter);
+                          return (
+                            <div key={opt.letter} style={{ padding: "0.5rem 0.75rem", borderRadius: "0.4rem", background: isCorrect ? "var(--green-bg)" : "var(--surface)", border: `1px solid ${isCorrect ? "var(--green)" : "var(--border)"}`, display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                              <span style={{ width: "1.25rem", height: "1.25rem", borderRadius: "50%", background: isCorrect ? "var(--green)" : "var(--surface2)", color: isCorrect ? "#fff" : "var(--text3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, flexShrink: 0 }}>{opt.letter}</span>
+                              <KaTeXDisplay text={opt.text} inline />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text3)", marginBottom: "0.5rem", textTransform: "uppercase" }}>Explanation</p>
+                      <div style={{ padding: "0.75rem", borderRadius: "0.4rem", background: "var(--surface)", border: "1px solid var(--border)", fontSize: "0.82rem", color: "var(--text2)" }}>
+                        {q.explanation ? <KaTeXDisplay text={q.explanation} /> : "No explanation provided."}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {expandedId === q.id && (
-                  <div className="px-6 pb-6 pt-4 border-t border-[var(--border)] bg-[var(--surface2)]/30">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">Options</h4>
-                        <div className="space-y-2">
-                          {[
-                            { letter: 'A', text: q.optionA, img: q.optionAImage },
-                            { letter: 'B', text: q.optionB, img: q.optionBImage },
-                            { letter: 'C', text: q.optionC, img: q.optionCImage },
-                            { letter: 'D', text: q.optionD, img: q.optionDImage },
-                          ].filter(o => o.text).map((opt) => (
-                            <div key={opt.letter} className={`p-3 rounded-lg border ${q.correctAnswer.includes(opt.letter) ? 'bg-green-500/10 border-green-500/30' : 'bg-[var(--surface)] border-[var(--border)]'}`}>
-                              <div className="flex gap-3">
-                                <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs ${q.correctAnswer.includes(opt.letter) ? 'bg-green-500 text-white' : 'bg-[var(--border)]'}`}>{opt.letter}</span>
-                                <div>
-                                  <p className="text-sm">{opt.text}</p>
-                                  {opt.img && <img src={opt.img} className="mt-2 max-h-32 rounded" alt="" />}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold mb-3">Explanation</h4>
-                        <div className="p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-sm text-[var(--text2)]">
-                          {q.explanation || "No explanation provided."}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })}
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

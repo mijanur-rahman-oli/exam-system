@@ -7,6 +7,27 @@ import { Clock, AlertCircle, CheckCircle } from "lucide-react";
 
 type Answer = { questionId: number; selectedAnswer: string };
 
+// ─── KaTeX renderer ───────────────────────────────────────────────────────────
+function KaTeXDisplay({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!ref.current || !text) return;
+    import("katex").then((katex) => {
+      let html = text
+        .replace(/\$\$(.+?)\$\$/gs, (_, expr) => {
+          try { return katex.default.renderToString(expr, { displayMode: true,  throwOnError: false }); }
+          catch { return _; }
+        })
+        .replace(/\$(.+?)\$/g, (_, expr) => {
+          try { return katex.default.renderToString(expr, { displayMode: false, throwOnError: false }); }
+          catch { return _; }
+        });
+      if (ref.current) ref.current.innerHTML = html;
+    });
+  }, [text]);
+  return <span ref={ref} style={{ fontSize: "inherit", lineHeight: "inherit", color: "inherit" }} />;
+}
+
 export default function TakeExamPage() {
   const { examId } = useParams<{ examId: string }>();
   const router = useRouter();
@@ -99,6 +120,7 @@ export default function TakeExamPage() {
   const answered  = Object.keys(answers).length;
   const isLowTime = timeLeft !== null && timeLeft < 120;
 
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (examLoading || startMutation.isPending || !examStarted || !exam) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", flexDirection: "column", gap: "1rem" }}>
@@ -111,6 +133,7 @@ export default function TakeExamPage() {
     );
   }
 
+  // ── Error ──────────────────────────────────────────────────────────────────
   if (startError) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
@@ -140,8 +163,12 @@ export default function TakeExamPage() {
     );
   }
 
+  // ── Exam UI ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0", margin: "-2rem" }}>
+
+      {/* KaTeX CSS */}
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
 
       {/* Sticky header */}
       <div style={{
@@ -179,10 +206,10 @@ export default function TakeExamPage() {
       {/* All questions */}
       <div style={{ padding: "2rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         {questions.map((item: any, idx: number) => {
-          const q         = item.question;
-          const qId       = q.id;
-          const selected  = answers[qId];
-          const opts      = [
+          const q        = item.question;
+          const qId      = q.id;
+          const selected = answers[qId];
+          const opts     = [
             { key: "A", text: q.optionA },
             { key: "B", text: q.optionB },
             { key: "C", text: q.optionC },
@@ -199,11 +226,12 @@ export default function TakeExamPage() {
                 boxShadow: "var(--shadow)", transition: "border-color 0.2s",
               }}
             >
+              {/* Question text */}
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
-                <p style={{ fontSize: "0.95rem", lineHeight: 1.7, color: "var(--text)", margin: 0, flex: 1 }}>
+                <div style={{ fontSize: "0.95rem", lineHeight: 1.7, color: "var(--text)", flex: 1 }}>
                   <span style={{ fontWeight: 800, color: "var(--accent)", marginRight: "0.5rem" }}>Q{idx + 1}.</span>
-                  {q.question}
-                </p>
+                  <KaTeXDisplay text={q.question} />
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
                   {selected && <CheckCircle size={16} color="var(--green)" />}
                   <span style={{ fontSize: "0.68rem", color: "var(--text3)", background: "var(--surface2)", padding: "0.2rem 0.5rem", borderRadius: "999px", whiteSpace: "nowrap" }}>
@@ -212,6 +240,7 @@ export default function TakeExamPage() {
                 </div>
               </div>
 
+              {/* Options */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {opts.map((opt) => {
                   const isSelected = selected === opt.key;
@@ -239,7 +268,7 @@ export default function TakeExamPage() {
                       }}>
                         {opt.key}
                       </div>
-                      {opt.text}
+                      <KaTeXDisplay text={opt.text} />
                     </button>
                   );
                 })}
