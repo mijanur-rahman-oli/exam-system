@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { Trophy, Clock, Medal, Users, ArrowLeft, Crown } from "lucide-react";
+import { Trophy, Clock, Medal, Users, ArrowLeft, Crown, Download } from "lucide-react";
 import Link from "next/link";
 
 type Entry = {
@@ -79,6 +79,32 @@ export default function LeaderboardPage() {
     </div>
   );
 
+
+  const exportCSV = () => {
+    if (!leaderboard.length) return;
+    const rows = [
+      ["Rank", "Name", "Score", "Total Marks", "Percentage", "Time (min)", "Type", "Submitted At"],
+      ...leaderboard.map((e) => [
+        e.rank,
+        e.name,
+        e.score,
+        e.totalMarks,
+        `${e.percentage}%`,
+        e.timeTaken ?? "—",
+        e.type,
+        e.submittedAt ? new Date(e.submittedAt).toLocaleString() : "—",
+      ]),
+    ];
+    const csv  = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `${exam?.examName ?? "exam"}_leaderboard.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
 
@@ -100,9 +126,19 @@ export default function LeaderboardPage() {
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.72rem", color: "var(--text3)" }}>
-          <Users size={13} />
-          {data.totalParticipants} participant{data.totalParticipants !== 1 ? "s" : ""}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {isAdmin && leaderboard.length > 0 && (
+            <button
+              onClick={exportCSV}
+              style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.45rem 0.9rem", borderRadius: "0.5rem", background: "var(--green-bg)", border: "1px solid var(--green)", color: "var(--green)", cursor: "pointer", fontSize: "0.78rem", fontWeight: 700 }}
+            >
+              <Download size={13} /> Export CSV
+            </button>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.72rem", color: "var(--text3)" }}>
+            <Users size={13} />
+            {data.totalParticipants} participant{data.totalParticipants !== 1 ? "s" : ""}
+          </div>
         </div>
       </div>
 
